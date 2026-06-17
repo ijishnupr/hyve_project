@@ -1,0 +1,70 @@
+{% load web_extras %}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  @page {
+    size: A4;
+    margin: 20mm 16mm 22mm 16mm;
+    @bottom-center {
+      content: "{{ doc_kind }} {{ doc_number }}  ·  Page " counter(page) " of " counter(pages);
+      font-size: 8pt; color: #9aa3b2;
+    }
+  }
+  * { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; }
+  body { color: #1f2733; font-size: 10pt; line-height: 1.45; }
+  .head { display: flex; justify-content: space-between; align-items: flex-start;
+          border-bottom: 2px solid #4f46e5; padding-bottom: 10px; margin-bottom: 16px; }
+  .org .name { font-size: 15pt; font-weight: 800; color: #0f1729; }
+  .org .sub { font-size: 8.5pt; color: #6b7589; }
+  .docbox { text-align: right; }
+  .docbox .kind { font-size: 13pt; font-weight: 800; color: #4f46e5; text-transform: uppercase; letter-spacing: .04em; }
+  .docbox .num { font-size: 11pt; font-weight: 700; }
+  .pill { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 8pt; font-weight: 700; }
+  .p-green{ background:#e7f7ee; color:#177245; } .p-amber{ background:#fdf1dd; color:#a05a00; }
+  .p-red{ background:#fdeaea; color:#b42318; } .p-blue{ background:#e7f0fd; color:#175cd3; }
+  .p-indigo{ background:#eef2ff; color:#4338ca; } .p-slate{ background:#eef1f6; color:#475067; }
+
+  .meta { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+  .meta td { vertical-align: top; padding: 0 14px 6px 0; width: 50%; }
+  .panel { border: 1px solid #e7eaf0; border-radius: 8px; padding: 10px 12px; }
+  .panel .lbl { font-size: 7.5pt; text-transform: uppercase; letter-spacing: .06em; color: #8a93a5; font-weight: 700; }
+  .panel .val { font-size: 9.5pt; }
+  .panel .big { font-weight: 700; font-size: 10.5pt; }
+
+  table.lines { width: 100%; border-collapse: collapse; margin-top: 4px; }
+  table.lines th { background: #f4f6fb; color: #56607a; font-size: 7.6pt; text-transform: uppercase;
+                   letter-spacing: .04em; text-align: left; padding: 7px 8px; border-bottom: 1px solid #e7eaf0; }
+  table.lines td { padding: 7px 8px; border-bottom: 1px solid #eef1f6; font-size: 9.2pt; }
+  table.lines td.r, table.lines th.r { text-align: right; }
+  .totals { width: 46%; margin-left: auto; margin-top: 10px; border-collapse: collapse; }
+  .totals td { padding: 4px 8px; font-size: 9.5pt; }
+  .totals td.r { text-align: right; }
+  .totals tr.grand td { border-top: 1.5px solid #1f2733; font-weight: 800; font-size: 11pt; }
+
+  .note { margin-top: 14px; font-size: 8.8pt; color: #4b5468; }
+  .note .lbl { font-weight: 700; color: #1f2733; }
+  .sign { margin-top: 40px; width: 100%; border-collapse: collapse; }
+  .sign td { width: 33%; text-align: center; font-size: 8.5pt; color: #6b7589; padding-top: 26px; }
+  .sign .line { border-top: 1px solid #9aa3b2; margin: 0 18px 4px; }
+  .matchbox { margin-top:12px; border:1px solid #e7eaf0; border-radius:8px; padding:10px 12px; font-size:8.8pt; }
+  .matchbox pre { white-space: pre-wrap; margin:4px 0 0; font-family: inherit; }
+</style>
+</head>
+<body>
+  <div class="head">
+    <div class="org">
+      <div class="name">🏗️ {{ org_name|default:"Construction Procurement Co." }}</div>
+      <div class="sub">{{ org_tagline|default:"Materials Procurement &amp; Vendor Management" }}</div>
+      <div class="sub">Generated {{ now|date:"d M Y, H:i" }}</div>
+    </div>
+    <div class="docbox">
+      <div class="kind">{{ doc_kind }}</div>
+      <div class="num">{{ doc_number }}</div>
+      <div style="margin-top:5px"><span class="pill p-{{ status_color }}">{{ status_label }}</span></div>
+    </div>
+  </div>
+  {% block body %}{% endblock %}
+</body>
+</html>

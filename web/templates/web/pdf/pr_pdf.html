@@ -1,0 +1,36 @@
+{% extends "web/pdf/base_pdf.html" %}
+{% block body %}
+<table class="meta"><tr>
+  <td><div class="panel">
+    <div class="lbl">Project / Site</div>
+    <div class="val big">{{ pr.project.name }}</div>
+    <div class="val">{{ pr.project.code }}{% if pr.project.location %} · {{ pr.project.location }}{% endif %}</div>
+  </div></td>
+  <td><div class="panel">
+    <div class="lbl">Details</div>
+    <div class="val">Requested by: <b>{{ pr.requested_by.get_full_name|default:pr.requested_by.get_username }}</b></div>
+    <div class="val">Required by: {{ pr.required_by|date:"d M Y"|default:"—" }}</div>
+    <div class="val">Raised on: {{ pr.created_at|date:"d M Y" }}</div>
+    {% if pr.approved_by %}<div class="val">Approved by: {{ pr.approved_by.get_username }} ({{ pr.approved_at|date:"d M Y" }})</div>{% endif %}
+  </div></td>
+</tr></table>
+
+<table class="lines">
+  <thead><tr><th style="width:8%">#</th><th>Material</th><th class="r">Quantity</th><th>Unit</th><th>Remarks</th></tr></thead>
+  <tbody>
+  {% for l in pr.lines.all %}
+    <tr><td>{{ forloop.counter }}</td><td>{{ l.material.name }}<br><span style="color:#8a93a5">{{ l.material.code }}</span></td>
+      <td class="r">{{ l.quantity }}</td><td>{{ l.material.get_unit_display }}</td><td>{{ l.remarks }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+{% if pr.notes %}<div class="note"><span class="lbl">Notes:</span> {{ pr.notes }}</div>{% endif %}
+{% if pr.rejection_reason %}<div class="note"><span class="lbl">Rejection reason:</span> {{ pr.rejection_reason }}</div>{% endif %}
+
+<table class="sign"><tr>
+  <td><div class="line"></div>Requested by</td>
+  <td><div class="line"></div>Approved by</td>
+  <td><div class="line"></div>Procurement</td>
+</tr></table>
+{% endblock %}

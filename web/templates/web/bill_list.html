@@ -1,0 +1,38 @@
+{% extends "web/base.html" %}
+{% load web_extras %}
+{% block title %}Vendor Bills{% endblock %}
+{% block crumb %}Procure-to-pay · <b>Vendor Bills</b>{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">Vendor Bills</h4>
+  {% if can_edit and billable_pos %}
+  <div class="dropdown">
+    <button class="btn btn-dark btn-sm dropdown-toggle" data-bs-toggle="dropdown">+ Bill against PO</button>
+    <ul class="dropdown-menu dropdown-menu-end">
+      {% for po in billable_pos %}
+        <li><a class="dropdown-item" href="{% url 'web:bill_new' po.pk %}">{{ po.number }} — {{ po.vendor.name }}</a></li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+</div>
+<div class="card"><div class="table-responsive">
+<table class="table table-hover align-middle mb-0">
+  <thead><tr><th>Number</th><th>Vendor invoice</th><th>Vendor</th><th>PO</th>
+    <th class="text-end">Total</th><th>Match</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for b in bills %}
+    <tr>
+      <td><a href="{% url 'web:bill_detail' b.pk %}">{{ b.number }}</a></td>
+      <td>{{ b.vendor_invoice_number }}</td>
+      <td>{{ b.vendor.name }}</td>
+      <td><a href="{% url 'web:po_detail' b.purchase_order.pk %}">{{ b.purchase_order.number }}</a></td>
+      <td class="text-end fw-semibold">₹{{ b.total }}</td>
+      <td><span class="badge {{ b.match_status|status_badge }}">{{ b.get_match_status_display }}</span></td>
+      <td><span class="badge {{ b.status|status_badge }}">{{ b.get_status_display }}</span></td>
+    </tr>
+  {% empty %}<tr><td colspan="7" class="text-muted text-center py-4">No bills yet.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div></div>
+{% endblock %}

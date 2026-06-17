@@ -1,0 +1,90 @@
+{% extends "web/base.html" %}
+{% load web_extras %}
+{% block title %}Dashboard{% endblock %}
+{% block crumb %}<b>Dashboard</b>{% endblock %}
+{% block content %}
+<div class="mb-4">
+  <h4 class="mb-1">Welcome back, {{ user.get_username }} 👋</h4>
+  <p class="text-muted mb-0">Here's what's happening across procurement today.</p>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3 col-xl">
+    <div class="card p-3"><div class="stat"><div class="chip c-indigo"><i class="bi bi-buildings"></i></div>
+      <div><div class="stat-num">{{ counts.projects }}</div><div class="stat-lbl">Projects</div></div></div>
+      <a class="small d-block mt-2" href="{% url 'web:project_list' %}">View all <i class="bi bi-chevron-right"></i></a></div>
+  </div>
+  <div class="col-6 col-lg-3 col-xl">
+    <div class="card p-3"><div class="stat"><div class="chip c-blue"><i class="bi bi-truck"></i></div>
+      <div><div class="stat-num">{{ counts.vendors }}</div><div class="stat-lbl">Vendors</div></div></div>
+      <a class="small d-block mt-2" href="{% url 'web:vendor_list' %}">View all <i class="bi bi-chevron-right"></i></a></div>
+  </div>
+  <div class="col-6 col-lg-3 col-xl">
+    <div class="card p-3"><div class="stat"><div class="chip c-slate"><i class="bi bi-box-seam"></i></div>
+      <div><div class="stat-num">{{ counts.materials }}</div><div class="stat-lbl">Materials</div></div></div>
+      <a class="small d-block mt-2" href="{% url 'web:material_list' %}">View all <i class="bi bi-chevron-right"></i></a></div>
+  </div>
+  <div class="col-6 col-lg-3 col-xl">
+    <div class="card p-3"><div class="stat"><div class="chip c-amber"><i class="bi bi-file-earmark-text"></i></div>
+      <div><div class="stat-num">{{ counts.requisitions }}</div><div class="stat-lbl">Requisitions</div></div></div>
+      <a class="small d-block mt-2" href="{% url 'web:pr_list' %}">View all <i class="bi bi-chevron-right"></i></a></div>
+  </div>
+  <div class="col-6 col-lg-3 col-xl">
+    <div class="card p-3"><div class="stat"><div class="chip c-indigo"><i class="bi bi-cart3"></i></div>
+      <div><div class="stat-num">{{ counts.purchase_orders }}</div><div class="stat-lbl">Purchase Orders</div></div></div>
+      <a class="small d-block mt-2" href="{% url 'web:po_list' %}">View all <i class="bi bi-chevron-right"></i></a></div>
+  </div>
+  <div class="col-6 col-lg-3 col-xl">
+    <div class="card p-3"><div class="stat"><div class="chip c-green"><i class="bi bi-receipt"></i></div>
+      <div><div class="stat-num">{{ counts.bills }}</div><div class="stat-lbl">Vendor Bills</div></div></div>
+      <a class="small d-block mt-2" href="{% url 'web:bill_list' %}">View all <i class="bi bi-chevron-right"></i></a></div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="card p-3 h-100">
+      <h6><i class="bi bi-file-earmark-text me-1"></i>Recent Requisitions</h6>
+      <table class="table table-sm align-middle mb-0">
+        <tbody>
+        {% for pr in recent_prs %}
+          <tr><td><a href="{% url 'web:pr_detail' pr.pk %}" class="fw-semibold">{{ pr.number }}</a>
+              <div class="text-muted" style="font-size:.76rem">{{ pr.project.name }}</div></td>
+              <td class="text-end"><span class="badge {{ pr.status|status_badge }}">{{ pr.get_status_display }}</span></td></tr>
+        {% empty %}<tr><td class="text-muted py-3 text-center">No requisitions yet.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card p-3 h-100">
+      <h6><i class="bi bi-cart3 me-1"></i>Recent Purchase Orders</h6>
+      <table class="table table-sm align-middle mb-0">
+        <tbody>
+        {% for po in recent_pos %}
+          <tr><td><a href="{% url 'web:po_detail' po.pk %}" class="fw-semibold">{{ po.number }}</a>
+              <div class="text-muted" style="font-size:.76rem">{{ po.vendor.name }}</div></td>
+              <td class="text-end fw-semibold">₹{{ po.total }}<br>
+              <span class="badge {{ po.status|status_badge }}">{{ po.get_status_display }}</span></td></tr>
+        {% empty %}<tr><td class="text-muted py-3 text-center">No purchase orders yet.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card p-3 h-100">
+      <h6><i class="bi bi-receipt me-1"></i>Recent Vendor Bills</h6>
+      <table class="table table-sm align-middle mb-0">
+        <tbody>
+        {% for b in recent_bills %}
+          <tr><td><a href="{% url 'web:bill_detail' b.pk %}" class="fw-semibold">{{ b.number }}</a>
+              <div class="text-muted" style="font-size:.76rem">{{ b.vendor.name }}</div></td>
+              <td class="text-end fw-semibold">₹{{ b.total }}<br>
+              <span class="badge {{ b.status|status_badge }}">{{ b.get_status_display }}</span></td></tr>
+        {% empty %}<tr><td class="text-muted py-3 text-center">No bills yet.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

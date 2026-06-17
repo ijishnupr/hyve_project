@@ -1,0 +1,25 @@
+# Core Framework
+Django==5.2.12
+djangorestframework==3.16.0
+djangorestframework-simplejwt==5.4.0
+django-cors-headers==4.9.0
+django-filter==25.2
+drf-spectacular==0.28.0
+
+# Database & Infrastructure
+psycopg[binary]==3.2.10
+dj-database-url==2.3.0
+python-dotenv==1.2.2
+whitenoise==6.9.0
+gunicorn==23.0.0
+
+# Background Tasks
+celery==5.4.0
+redis==5.2.1
+
+# Utilities
+Pillow==11.1.0
+python-dateutil==2.9.0.post0
+weasyprint==69.0  # HTML -> PDF for printable documents (needs system pango/cairo)
+
+# Development & Testing (see requirements-dev.txt for the full dev toolchain)

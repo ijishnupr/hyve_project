@@ -1,0 +1,58 @@
+{% extends "web/base.html" %}
+{% load web_extras %}
+{% block title %}{{ grn.number }}{% endblock %}
+{% block crumb %}<a href="{% url 'web:grn_list' %}">Goods Receipts</a> · <b>{{ grn.number }}</b>{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3">
+  <div>
+    <h4 class="mb-1">GRN {{ grn.number }}
+      <span class="badge {{ grn.status|status_badge }} align-middle">{{ grn.get_status_display }}</span></h4>
+    <div class="text-muted small">Against
+      <a href="{% url 'web:po_detail' grn.purchase_order.pk %}">{{ grn.purchase_order.number }}</a>
+      · received by {{ grn.received_by.get_username }} on {{ grn.received_date }}</div>
+  </div>
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'web:grn_list' %}">Back</a>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card p-3">
+      <h6>Received lines</h6>
+      <table class="table table-sm">
+        <thead><tr><th>Material</th><th class="text-end">Received</th><th class="text-end">Accepted</th>
+          <th class="text-end">Rejected</th><th>Remarks</th></tr></thead>
+        <tbody>
+        {% for l in grn.lines.all %}
+          <tr><td>{{ l.po_line.material.name }}</td><td class="text-end">{{ l.received_quantity }}</td>
+            <td class="text-end">{{ l.accepted_quantity }}</td><td class="text-end">{{ l.rejected_quantity }}</td>
+            <td>{{ l.remarks }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% if grn.challan_number or grn.vehicle_number %}
+      <p class="small text-muted mb-0">Challan: {{ grn.challan_number|default:"—" }} · Vehicle: {{ grn.vehicle_number|default:"—" }}</p>
+      {% endif %}
+      {% if grn.notes %}<p class="small text-muted mb-0">{{ grn.notes }}</p>{% endif %}
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card p-3">
+      <h6>Actions</h6>
+      {% if can_edit %}
+        {% if grn.status == 'DRAFT' %}
+          <form method="post" action="{% url 'web:grn_confirm' grn.pk %}">{% csrf_token %}
+            <button class="btn btn-success btn-sm w-100 mb-2">Confirm receipt</button></form>
+          <form method="post" action="{% url 'web:grn_cancel' grn.pk %}">{% csrf_token %}
+            <button class="btn btn-outline-danger btn-sm w-100">Cancel</button></form>
+        {% elif grn.status == 'CONFIRMED' %}
+          <p class="small text-muted">Confirmed — quantities posted to the PO.</p>
+          <form method="post" action="{% url 'web:grn_cancel' grn.pk %}" onsubmit="return confirm('Cancel and reverse posted quantities?')">{% csrf_token %}
+            <button class="btn btn-outline-danger btn-sm w-100">Cancel (reverse)</button></form>
+        {% else %}
+          <p class="text-muted small mb-0">Cancelled.</p>
+        {% endif %}
+      {% else %}<p class="text-muted small mb-0">Read-only.</p>{% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

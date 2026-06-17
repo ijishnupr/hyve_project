@@ -1,0 +1,26 @@
+{% extends "web/base.html" %}
+{% load web_extras %}
+{% block title %}Requisitions{% endblock %}
+{% block crumb %}Procure-to-pay · <b>Requisitions</b>{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">Purchase Requisitions</h4>
+  {% if can_edit %}<a class="btn btn-dark btn-sm" href="{% url 'web:pr_new' %}">+ New Requisition</a>{% endif %}
+</div>
+<div class="card"><div class="table-responsive">
+<table class="table table-hover align-middle mb-0">
+  <thead><tr><th>Number</th><th>Project</th><th>Required by</th><th>Requested by</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for pr in prs %}
+    <tr>
+      <td><a href="{% url 'web:pr_detail' pr.pk %}">{{ pr.number }}</a></td>
+      <td>{{ pr.project.name }}</td>
+      <td>{{ pr.required_by|default:"—" }}</td>
+      <td>{{ pr.requested_by.get_username }}</td>
+      <td><span class="badge {{ pr.status|status_badge }}">{{ pr.get_status_display }}</span></td>
+    </tr>
+  {% empty %}<tr><td colspan="5" class="text-muted text-center py-4">No requisitions yet.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div></div>
+{% endblock %}

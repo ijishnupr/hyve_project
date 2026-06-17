@@ -1,0 +1,56 @@
+{% extends "web/base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block crumb %}<b>{{ title }}</b>{% endblock %}
+{% block content %}
+<h4 class="mb-3">{{ title }}</h4>
+<form method="post">
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert alert-danger py-2">{{ form.non_field_errors }}</div>{% endif %}
+
+  <div class="card p-4 mb-3">
+    <div class="row g-3">
+      {% for field in form %}
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold">{{ field.label }}</label>
+        {{ field }}
+        {% for e in field.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card p-4 mb-3">
+    <h6 class="mb-3">{{ line_label }}</h6>
+    {{ formset.management_form }}
+    {% if formset.non_form_errors %}<div class="alert alert-danger py-2">{{ formset.non_form_errors }}</div>{% endif %}
+    {% with prefix=formset.prefix %}
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead><tr>
+          {% for f in formset.empty_form.visible_fields %}<th class="small">{{ f.label }}</th>{% endfor %}
+          <th></th>
+        </tr></thead>
+        <tbody id="rows-{{ prefix }}">
+          {% for f in formset %}
+          <tr class="formset-row">
+            <td class="d-none">{% for h in f.hidden_fields %}{{ h }}{% endfor %}</td>
+            {% for field in f.visible_fields %}
+              <td>{{ field }}{% for e in field.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <button type="button" class="btn btn-sm btn-outline-secondary" data-add-row="{{ prefix }}">+ Add line</button>
+    <template id="empty-{{ prefix }}">
+      <td class="d-none">{% for h in formset.empty_form.hidden_fields %}{{ h }}{% endfor %}</td>
+      {% for field in formset.empty_form.visible_fields %}<td>{{ field }}</td>{% endfor %}
+    </template>
+    {% endwith %}
+  </div>
+
+  <button class="btn btn-dark">Save</button>
+  <a class="btn btn-link" href="{{ cancel_url }}">Cancel</a>
+</form>
+{% endblock %}

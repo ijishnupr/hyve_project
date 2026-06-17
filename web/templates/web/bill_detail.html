@@ -1,0 +1,72 @@
+{% extends "web/base.html" %}
+{% load web_extras %}
+{% block title %}{{ bill.number }}{% endblock %}
+{% block crumb %}<a href="{% url 'web:bill_list' %}">Vendor Bills</a> · <b>{{ bill.number }}</b>{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3">
+  <div>
+    <h4 class="mb-1">Bill {{ bill.number }}
+      <span class="badge {{ bill.status|status_badge }} align-middle">{{ bill.get_status_display }}</span>
+      <span class="badge {{ bill.match_status|status_badge }} align-middle">Match: {{ bill.get_match_status_display }}</span></h4>
+    <div class="text-muted small">Invoice {{ bill.vendor_invoice_number }} · {{ bill.vendor }} ·
+      against <a href="{% url 'web:po_detail' bill.purchase_order.pk %}">{{ bill.purchase_order.number }}</a></div>
+  </div>
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'web:bill_list' %}">Back</a>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card p-3">
+      <h6>Billed lines</h6>
+      <table class="table table-sm">
+        <thead><tr><th>Material</th><th class="text-end">Qty</th><th class="text-end">Unit price</th>
+          <th class="text-end">Tax %</th><th class="text-end">Line total</th></tr></thead>
+        <tbody>
+        {% for l in bill.lines.all %}
+          <tr><td>{{ l.po_line.material.name }}</td><td class="text-end">{{ l.quantity }}</td>
+            <td class="text-end">{{ l.unit_price }}</td><td class="text-end">{{ l.tax_rate }}</td>
+            <td class="text-end">{{ l.line_total }}</td></tr>
+        {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr><th colspan="4" class="text-end">Subtotal</th><th class="text-end">{{ bill.subtotal }}</th></tr>
+          <tr><th colspan="4" class="text-end">Tax</th><th class="text-end">{{ bill.tax_amount }}</th></tr>
+          <tr><th colspan="4" class="text-end">Total</th><th class="text-end">{{ bill.total }}</th></tr>
+        </tfoot>
+      </table>
+    </div>
+    {% if bill.match_notes %}
+    <div class="card p-3 mt-3">
+      <h6>3-way match result</h6>
+      <pre class="small mb-0" style="white-space:pre-wrap">{{ bill.match_notes }}</pre>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card p-3">
+      <h6>Actions</h6>
+      {% if can_edit %}
+        {% if bill.status == 'DRAFT' or bill.status == 'DISPUTED' %}
+          <form method="post" action="{% url 'web:bill_match' bill.pk %}">{% csrf_token %}
+            <button class="btn btn-primary btn-sm w-100 mb-2">Run 3-way match</button></form>
+        {% endif %}
+        {% if bill.status == 'MATCHED' %}
+          <form method="post" action="{% url 'web:bill_approve' bill.pk %}">{% csrf_token %}
+            <button class="btn btn-success btn-sm w-100 mb-2">Approve for payment</button></form>
+        {% endif %}
+        {% if bill.status == 'APPROVED' %}
+          <form method="post" action="{% url 'web:bill_mark_paid' bill.pk %}">{% csrf_token %}
+            <button class="btn btn-dark btn-sm w-100 mb-2">Mark as paid</button></form>
+        {% endif %}
+        {% if bill.status == 'PAID' %}<p class="text-success small mb-0">Paid ✔</p>{% endif %}
+      {% else %}<p class="text-muted small mb-0">Read-only (accountants/admins manage bills).</p>{% endif %}
+      <hr>
+      <div class="small text-muted">
+        Created by {{ bill.created_by.get_username }}<br>
+        Bill date {{ bill.bill_date }}{% if bill.due_date %} · due {{ bill.due_date }}{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,90 @@
+{% extends "web/base.html" %}
+{% load web_extras %}
+{% block title %}{{ po.number }}{% endblock %}
+{% block crumb %}<a href="{% url 'web:po_list' %}">Purchase Orders</a> · <b>{{ po.number }}</b>{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3">
+  <div>
+    <h4 class="mb-1">Purchase Order {{ po.number }}
+      <span class="badge {{ po.status|status_badge }} align-middle">{{ po.get_status_display }}</span></h4>
+    <div class="text-muted small">{{ po.vendor }} · {{ po.project }}
+      {% if po.requisition %}· from <a href="{% url 'web:pr_detail' po.requisition.pk %}">{{ po.requisition.number }}</a>{% endif %}</div>
+  </div>
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'web:po_list' %}">Back</a>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card p-3">
+      <h6>Order lines</h6>
+      <table class="table table-sm">
+        <thead><tr><th>Material</th><th class="text-end">Qty</th><th class="text-end">Received</th>
+          <th class="text-end">Unit price</th><th class="text-end">Tax %</th><th class="text-end">Line total</th></tr></thead>
+        <tbody>
+        {% for l in po.lines.all %}
+          <tr><td>{{ l.material.name }}</td><td class="text-end">{{ l.quantity }}</td>
+            <td class="text-end">{{ l.received_quantity }}</td><td class="text-end">{{ l.unit_price }}</td>
+            <td class="text-end">{{ l.tax_rate }}</td><td class="text-end">{{ l.line_total }}</td></tr>
+        {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr><th colspan="5" class="text-end">Subtotal</th><th class="text-end">{{ po.subtotal }}</th></tr>
+          <tr><th colspan="5" class="text-end">Tax</th><th class="text-end">{{ po.tax_amount }}</th></tr>
+          <tr><th colspan="5" class="text-end">Total</th><th class="text-end">{{ po.total }}</th></tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <div class="card p-3 mt-3">
+      <h6>Goods Receipts</h6>
+      <ul class="list-unstyled mb-0 small">
+        {% for g in po.grns.all %}
+          <li><a href="{% url 'web:grn_detail' g.pk %}">{{ g.number }}</a> — {{ g.get_status_display }} ({{ g.received_date }})</li>
+        {% empty %}<li class="text-muted">None yet.</li>{% endfor %}
+      </ul>
+    </div>
+
+    <div class="card p-3 mt-3">
+      <h6>Vendor Bills</h6>
+      <ul class="list-unstyled mb-0 small">
+        {% for b in po.bills.all %}
+          <li><a href="{% url 'web:bill_detail' b.pk %}">{{ b.number }}</a> — {{ b.get_status_display }} / {{ b.get_match_status_display }}</li>
+        {% empty %}<li class="text-muted">None yet.</li>{% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card p-3">
+      <h6>Actions</h6>
+      {% if po.status == 'DRAFT' %}
+        {% if can_edit %}<a class="btn btn-outline-secondary btn-sm w-100 mb-2" href="{% url 'web:po_edit' po.pk %}">Edit</a>{% endif %}
+        {% if can_approve %}<form method="post" action="{% url 'web:po_issue' po.pk %}">{% csrf_token %}
+          <button class="btn btn-primary btn-sm w-100 mb-2">Issue to vendor</button></form>{% endif %}
+      {% endif %}
+      {% if receivable and can_edit %}
+        <a class="btn btn-success btn-sm w-100 mb-2" href="{% url 'web:grn_new' po.pk %}">Receive goods (GRN)</a>
+      {% endif %}
+      {% if po.status != 'DRAFT' and po.status != 'CANCELLED' and can_bill %}
+        <a class="btn btn-outline-dark btn-sm w-100 mb-2" href="{% url 'web:bill_new' po.pk %}">Create vendor bill</a>
+      {% endif %}
+      {% if can_approve %}
+        {% if po.status == 'PARTIALLY_RECEIVED' or po.status == 'RECEIVED' %}
+          <form method="post" action="{% url 'web:po_close' po.pk %}">{% csrf_token %}
+            <button class="btn btn-outline-secondary btn-sm w-100 mb-2">Close PO</button></form>
+        {% endif %}
+        {% if po.status != 'RECEIVED' and po.status != 'CLOSED' and po.status != 'CANCELLED' %}
+          <form method="post" action="{% url 'web:po_cancel' po.pk %}" onsubmit="return confirm('Cancel this PO?')">{% csrf_token %}
+            <button class="btn btn-outline-danger btn-sm w-100">Cancel PO</button></form>
+        {% endif %}
+      {% endif %}
+      <hr>
+      <div class="small text-muted">
+        Created by {{ po.created_by.get_username }}<br>
+        {% if po.approved_by %}Issued by {{ po.approved_by.get_username }} on {{ po.approved_at|date:"d M Y H:i" }}<br>{% endif %}
+        Payment terms: {{ po.payment_terms_days }} days
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

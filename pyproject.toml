@@ -1,0 +1,12 @@
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+exclude = ["migrations", "env", ".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "DJ"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"*/tests/*" = ["B"]
+"core/settings.py" = ["E402"]
