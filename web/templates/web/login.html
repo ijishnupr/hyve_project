@@ -2,12 +2,17 @@
 {% block title %}Sign in{% endblock %}
 {% block fullpage %}
 <div class="d-flex align-items-center justify-content-center"
-     style="min-height:100vh; background:radial-gradient(1200px 500px at 70% -10%, #e7e9ff 0%, #f4f6fb 55%);">
-  <div class="card border-0 shadow p-4" style="width:400px; border-radius:18px;">
-    <div class="text-center mb-3">
-      <div class="mx-auto mb-2" style="width:54px;height:54px;border-radius:14px;display:grid;place-items:center;
-           background:linear-gradient(135deg,#4f46e5,#7c83f3);font-size:1.6rem;">🏗️</div>
-      <h5 class="mb-1 fw-bold">Construction Procurement</h5>
+     style="min-height:100vh; background:
+       radial-gradient(1100px 520px at 15% -10%, rgba(0,113,227,.16), transparent 60%),
+       radial-gradient(900px 500px at 90% 10%, rgba(90,200,250,.16), transparent 55%),
+       var(--bg);">
+  <div class="card p-4" style="width:400px; border-radius:26px; box-shadow:var(--shadow-pop);
+       -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur); background:var(--card);">
+    <div class="text-center mb-4">
+      <div class="mx-auto mb-3" style="width:60px;height:60px;border-radius:17px;display:grid;place-items:center;
+           background:linear-gradient(160deg,var(--accent),#5ac8fa);font-size:1.8rem;
+           box-shadow:0 8px 22px rgba(0,113,227,.35);">🏗️</div>
+      <h4 class="mb-1 fw-semibold">Construction Procurement</h4>
       <p class="text-muted small mb-0">Sign in to your workspace</p>
     </div>
     {% if form.non_field_errors %}
@@ -23,9 +28,9 @@
         <label class="form-label small fw-semibold">Password</label>
         {{ form.password }}
       </div>
-      <button class="btn btn-dark w-100 py-2">Sign in <i class="bi bi-arrow-right ms-1"></i></button>
+      <button class="btn btn-primary w-100 py-2 mt-1">Sign in <i class="bi bi-arrow-right ms-1"></i></button>
     </form>
-    <div class="text-center text-muted small mt-3">
+    <div class="text-center text-muted small mt-4">
       Demo access · <code>admin</code> / <code>admin12345</code>
     </div>
   </div>

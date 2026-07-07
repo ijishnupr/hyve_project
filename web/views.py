@@ -10,7 +10,7 @@ from django.contrib import messages
 from django.contrib.auth import login as auth_login, logout as auth_logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
-from django.db.models import Count
+from django.db.models import Count, Sum
 from django.forms import inlineformset_factory
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -102,8 +102,45 @@ def _status_counts(model):
     }
 
 
+def _sum(qs):
+    return qs.aggregate(s=Sum("total"))["s"] or 0
+
+
 @login_required
 def dashboard(request):
+    POStatus = PurchaseOrder.Status
+    BillStatus = VendorBill.Status
+
+    # Money in flight across the procure-to-pay cycle.
+    open_po_value = _sum(PurchaseOrder.objects.filter(
+        status__in=[POStatus.ISSUED, POStatus.PARTIALLY_RECEIVED]))
+    committed_value = _sum(PurchaseOrder.objects.exclude(
+        status__in=[POStatus.DRAFT, POStatus.CANCELLED]))
+    payable_value = _sum(VendorBill.objects.filter(
+        status__in=[BillStatus.MATCHED, BillStatus.APPROVED]))
+    paid_value = _sum(VendorBill.objects.filter(status=BillStatus.PAID))
+
+    # A cross-document "needs attention" queue for approvers/accountants.
+    attention = []
+    for pr in PurchaseRequisition.objects.filter(
+            status=PurchaseRequisition.Status.SUBMITTED).select_related("project")[:6]:
+        attention.append({"kind": "Requisition", "icon": "bi-file-earmark-text",
+                          "number": pr.number, "detail": pr.project.name,
+                          "action": "Awaiting approval", "color": "amber",
+                          "url": reverse("web:pr_detail", args=[pr.pk])})
+    for bill in VendorBill.objects.filter(
+            status=BillStatus.DISPUTED).select_related("vendor")[:6]:
+        attention.append({"kind": "Vendor bill", "icon": "bi-receipt",
+                          "number": bill.number, "detail": bill.vendor.name,
+                          "action": "3-way match exception", "color": "red",
+                          "url": reverse("web:bill_detail", args=[bill.pk])})
+    for bill in VendorBill.objects.filter(
+            status=BillStatus.MATCHED).select_related("vendor")[:6]:
+        attention.append({"kind": "Vendor bill", "icon": "bi-receipt",
+                          "number": bill.number, "detail": bill.vendor.name,
+                          "action": "Ready to approve", "color": "blue",
+                          "url": reverse("web:bill_detail", args=[bill.pk])})
+
     ctx = {
         "counts": {
             "projects": Project.objects.count(),
@@ -114,9 +151,16 @@ def dashboard(request):
             "grns": GoodsReceiptNote.objects.count(),
             "bills": VendorBill.objects.count(),
         },
+        "money": {
+            "open_po": open_po_value,
+            "committed": committed_value,
+            "payable": payable_value,
+            "paid": paid_value,
+        },
         "pr_status": _status_counts(PurchaseRequisition),
         "po_status": _status_counts(PurchaseOrder),
         "bill_status": _status_counts(VendorBill),
+        "attention": attention[:8],
         "recent_prs": PurchaseRequisition.objects.select_related("project")[:5],
         "recent_pos": PurchaseOrder.objects.select_related("vendor", "project")[:5],
         "recent_bills": VendorBill.objects.select_related("vendor")[:5],
