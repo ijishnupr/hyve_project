@@ -1,5 +1,5 @@
 """Tests for purchase contracts (blanket orders, pricing, renewal, consumption)."""
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
 
 import pytest

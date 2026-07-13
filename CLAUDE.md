@@ -13,9 +13,42 @@ the full *procure-to-pay* cycle for construction sites and enforces the business
 rules at every transition.
 
 ```
-Purchase Requisition  ──▶  Purchase Order  ──▶  Goods Receipt (GRN)  ──▶  Vendor Bill
-   (site raises)            (issued to vendor)    (materials received)    (3-way matched)
+Supplier ─▶ Requisition ─▶ RFQ ─▶ Quotation Comparison ─▶ Purchase Order
+        ─▶ Goods Receipt (GRN) ─▶ Quality Inspection ─▶ Vendor Bill (Supplier Invoice)
+        ─▶ 3-Way Match ─▶ Supplier Payment ─▶ Purchase Return (optional)
 ```
+
+The module implements the **full functional spec** in
+`Purchase_Module_Functional_Design_Document-1.docx`. Beyond the core spine
+(Requisition → PO → GRN → Bill) the following are also implemented — keep them
+consistent when extending:
+
+- **Supplier management**: `SupplierContact` / `SupplierAddress` /
+  `SupplierBankAccount` / `SupplierDocument` (child records of `Vendor`), plus
+  `pan` / `credit_limit` fields.
+- **RFQ** (`RequestForQuotation` + `RFQLine`) and **Quotation Comparison**
+  (`SupplierQuotation` + `SupplierQuotationLine`) — selecting a quotation raises a
+  draft PO (`services.select_quotation`).
+- **Approval workflow** (`ApprovalRule` matrix + `ApprovalRequest` / `ApprovalStep`)
+  — threshold-banded, multi-level, with escalation `due_at`. PO issue is gated on a
+  completed approval when a rule matches (`services.submit_po_for_approval`).
+- **PO enhancements**: `PurchaseOrderRevision` history, `revision` counter,
+  `reopen_purchase_order`, email to vendor, WeasyPrint PDF print.
+- **Inventory**: `StockItem` (on-hand) + `StockLedgerEntry`. Confirming a GRN posts
+  a RECEIPT movement; cancelling/returning reverses it (`services.post_stock_movement`).
+- **Quality Inspection** (`QualityInspection` + `QCChecklistItem`) against a GRN;
+  pass/fail derived from the checklist; images via `Attachment`.
+- **Supplier Payments** (`Payment`, `PaymentSchedule`) — advance / partial /
+  scheduled; a bill auto-settles to PAID when fully paid.
+- **Purchase Returns** (`PurchaseReturn` + `PurchaseReturnLine`) — reverses received
+  qty and stock; credit-note / refund / replacement.
+- **Purchase Contracts** (`PurchaseContract` + `ContractLine`) — blanket / rate
+  contracts, pricing, consumption draw-down on PO issue, renewal (clones lines).
+- **Reports** (`procurement/reports.py`) and **Analytics** (`procurement/analytics.py`)
+  back both the web pages and JSON endpoints.
+- **Generic `Attachment`** (content-type FK) usable on any document.
+- **Audit trail** (`AuditLog` via `services.log_action`) and **in-app Notifications**
+  (`Notification` via `services.notify`), written by the key transitions.
 
 ## Tech stack
 

@@ -9,6 +9,7 @@ urlpatterns = [
     path("login/", views.login_view, name="login"),
     path("logout/", views.logout_view, name="logout"),
     path("", views.dashboard, name="dashboard"),
+    path("analytics/", views.analytics_view, name="analytics"),
 
     # Master data
     path("projects/", views.project_list, name="project_list"),
@@ -128,4 +129,15 @@ urlpatterns = [
     path("contracts/<int:pk>/activate/", views.contract_activate, name="contract_activate"),
     path("contracts/<int:pk>/terminate/", views.contract_terminate, name="contract_terminate"),
     path("contracts/<int:pk>/renew/", views.contract_renew, name="contract_renew"),
+
+    # Notifications & audit
+    path("notifications/", views.notification_list, name="notification_list"),
+    path("notifications/<int:pk>/read/", views.notification_read, name="notification_read"),
+    path("notifications/read-all/", views.notifications_read_all, name="notifications_read_all"),
+    path("history/<str:model>/<int:object_id>/", views.audit_history, name="audit_history"),
+
+    # Reports
+    path("reports/", views.reports_index, name="reports_index"),
+    path("reports/supplier-ledger/", views.supplier_ledger_report, name="supplier_ledger_report"),
+    path("reports/<slug:slug>/", views.report_view, name="report_view"),
 ]

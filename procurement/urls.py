@@ -1,3 +1,4 @@
+from django.urls import path
 from rest_framework.routers import DefaultRouter
 
 from .views import (
@@ -5,20 +6,22 @@ from .views import (
     ApprovalRuleViewSet,
     ApprovalStepViewSet,
     AttachmentViewSet,
-    PaymentScheduleViewSet,
-    PaymentViewSet,
-    PurchaseContractViewSet,
-    PurchaseReturnViewSet,
-    QualityInspectionViewSet,
-    StockItemViewSet,
-    StockLedgerEntryViewSet,
+    AuditLogViewSet,
     GoodsReceiptNoteViewSet,
     MaterialCategoryViewSet,
     MaterialViewSet,
+    NotificationViewSet,
+    PaymentScheduleViewSet,
+    PaymentViewSet,
     ProjectViewSet,
+    PurchaseContractViewSet,
     PurchaseOrderViewSet,
     PurchaseRequisitionViewSet,
+    PurchaseReturnViewSet,
+    QualityInspectionViewSet,
     RequestForQuotationViewSet,
+    StockItemViewSet,
+    StockLedgerEntryViewSet,
     SupplierAddressViewSet,
     SupplierBankAccountViewSet,
     SupplierContactViewSet,
@@ -26,6 +29,7 @@ from .views import (
     SupplierQuotationViewSet,
     VendorBillViewSet,
     VendorViewSet,
+    report_api,
 )
 
 router = DefaultRouter()
@@ -54,5 +58,9 @@ router.register("payments", PaymentViewSet)
 router.register("payment-schedules", PaymentScheduleViewSet)
 router.register("purchase-returns", PurchaseReturnViewSet)
 router.register("purchase-contracts", PurchaseContractViewSet)
+router.register("audit-logs", AuditLogViewSet)
+router.register("notifications", NotificationViewSet, basename="notification")
 
-urlpatterns = router.urls
+urlpatterns = router.urls + [
+    path("reports/<slug:slug>/", report_api, name="report-api"),
+]

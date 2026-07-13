@@ -1,0 +1,21 @@
+{% extends "web/base.html" %}
+{% block title %}History{% endblock %}
+{% block crumb %}<b>History{% if obj %} — {{ obj }}{% endif %}</b>{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">Audit History{% if obj %} — {{ obj }}{% endif %}</h4>
+  <a class="btn btn-outline-secondary btn-sm" href="javascript:history.back()">Back</a>
+</div>
+<div class="card"><div class="table-responsive">
+<table class="table table-hover align-middle mb-0">
+  <thead><tr><th>When</th><th>Action</th><th>From → To</th><th>By</th><th>Note</th></tr></thead>
+  <tbody>
+  {% for l in logs %}
+    <tr><td>{{ l.created_at|date:"d M Y H:i" }}</td><td>{{ l.action }}</td>
+      <td>{% if l.from_status or l.to_status %}{{ l.from_status|default:"—" }} → {{ l.to_status|default:"—" }}{% else %}—{% endif %}</td>
+      <td>{{ l.actor.get_username|default:"system" }}</td><td class="small text-muted">{{ l.note }}</td></tr>
+  {% empty %}<tr><td colspan="5" class="text-muted text-center py-4">No history recorded.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div></div>
+{% endblock %}

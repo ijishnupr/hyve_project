@@ -6,7 +6,6 @@ from procurement.models import (
     SupplierAddress,
     SupplierBankAccount,
     SupplierContact,
-    Vendor,
 )
 
 pytestmark = pytest.mark.django_db

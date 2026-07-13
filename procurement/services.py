@@ -20,14 +20,16 @@ from .models import (
     ApprovalRequest,
     ApprovalRule,
     ApprovalStep,
+    AuditLog,
+    ContractLine,
     GoodsReceiptNote,
+    Notification,
+    Payment,
+    PurchaseContract,
     PurchaseOrder,
     PurchaseOrderLine,
     PurchaseOrderRevision,
     PurchaseRequisition,
-    ContractLine,
-    Payment,
-    PurchaseContract,
     PurchaseReturn,
     QCChecklistItem,
     QualityInspection,
@@ -42,6 +44,39 @@ from .models import (
 
 class TransitionError(Exception):
     """Raised when a requested state transition is not allowed."""
+
+
+# ---------------------------------------------------------------------------
+# Audit trail + notifications (cross-cutting helpers)
+# ---------------------------------------------------------------------------
+def log_action(document, *, action: str, user=None, from_status: str = "",
+               to_status: str = "", note: str = "") -> AuditLog:
+    """Append an immutable audit-trail entry for a document action."""
+    from django.contrib.contenttypes.models import ContentType as _CT
+    ct = _CT.objects.get_for_model(type(document))
+    return AuditLog.objects.create(
+        content_type=ct, object_id=document.pk, document_label=str(document),
+        action=action, from_status=from_status, to_status=to_status,
+        note=note, actor=user,
+    )
+
+
+def notify(*, message: str, kind: str = Notification.Kind.GENERAL, url: str = "",
+           recipient=None, recipient_role: str = "") -> Notification:
+    """Create an in-app notification for a user or a whole role."""
+    return Notification.objects.create(
+        recipient=recipient, recipient_role=recipient_role or "",
+        kind=kind, message=message, url=url,
+    )
+
+
+def notifications_for(user):
+    """Notifications addressed to a user directly or to their role."""
+    from django.db.models import Q
+    return Notification.objects.filter(
+        Q(recipient=user) | Q(recipient__isnull=True, recipient_role=user.role)
+        | Q(recipient__isnull=True, recipient_role="")
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -176,6 +211,10 @@ def submit_requisition(pr: PurchaseRequisition) -> PurchaseRequisition:
         raise TransitionError("Cannot submit a requisition with no line items.")
     pr.status = PurchaseRequisition.Status.SUBMITTED
     pr.save(update_fields=["status", "updated_at"])
+    log_action(pr, action="Submitted for approval", from_status="DRAFT", to_status="SUBMITTED")
+    notify(message=f"Requisition {pr.number} awaits approval",
+           kind=Notification.Kind.APPROVAL, recipient_role="PROCUREMENT_MANAGER",
+           url=f"/requisitions/{pr.pk}/")
     return pr
 
 
@@ -186,6 +225,7 @@ def approve_requisition(pr: PurchaseRequisition, *, user) -> PurchaseRequisition
     pr.approved_by = user
     pr.approved_at = timezone.now()
     pr.save(update_fields=["status", "approved_by", "approved_at", "updated_at"])
+    log_action(pr, action="Approved", user=user, from_status="SUBMITTED", to_status="APPROVED")
     return pr
 
 
@@ -236,6 +276,9 @@ def send_rfq(rfq: RequestForQuotation, *, user=None) -> RequestForQuotation:
     rfq.status = RequestForQuotation.Status.SENT
     rfq.sent_at = timezone.now()
     rfq.save(update_fields=["status", "sent_at", "updated_at"])
+    log_action(rfq, action="Sent to suppliers", user=user, to_status="SENT")
+    notify(message=f"RFQ {rfq.number} sent to {rfq.vendors.count()} supplier(s)",
+           kind=Notification.Kind.RFQ, url=f"/rfqs/{rfq.pk}/")
     return rfq
 
 
@@ -379,6 +422,9 @@ def issue_purchase_order(po: PurchaseOrder, *, user) -> PurchaseOrder:
     if contract and contract.status == PurchaseContract.Status.ACTIVE and po.revision == 0:
         contract.consumed_value = (contract.consumed_value + po.total)
         contract.save(update_fields=["consumed_value", "updated_at"])
+    log_action(po, action="Issued to vendor", user=user, to_status="ISSUED")
+    notify(message=f"PO {po.number} issued to {po.vendor.name} ({po.total})",
+           kind=Notification.Kind.PO, url=f"/purchase-orders/{po.pk}/")
     return po
 
 
@@ -521,6 +567,9 @@ def confirm_grn(grn: GoodsReceiptNote) -> GoodsReceiptNote:
     grn.save(update_fields=["status", "updated_at"])
 
     grn.purchase_order.refresh_receipt_status()
+    log_action(grn, action="Confirmed; stock posted", user=grn.received_by, to_status="CONFIRMED")
+    notify(message=f"GRN {grn.number} confirmed against {grn.purchase_order.number}",
+           kind=Notification.Kind.GRN, url=f"/grns/{grn.pk}/")
     return grn
 
 
@@ -745,6 +794,7 @@ def mark_bill_paid(bill: VendorBill) -> VendorBill:
         raise TransitionError("Only approved bills can be marked paid.")
     bill.status = VendorBill.Status.PAID
     bill.save(update_fields=["status", "updated_at"])
+    log_action(bill, action="Marked paid", to_status="PAID")
     return bill
 
 
@@ -767,6 +817,10 @@ def post_payment(payment: Payment) -> Payment:
     if bill and bill.status == VendorBill.Status.APPROVED and bill.outstanding <= Decimal("0.00"):
         bill.status = VendorBill.Status.PAID
         bill.save(update_fields=["status", "updated_at"])
+    log_action(payment, action=f"Payment posted ({payment.amount})", to_status="PAID")
+    notify(message=f"Payment {payment.number} of {payment.amount} to {payment.vendor.name}",
+           kind=Notification.Kind.PAYMENT, recipient_role="ACCOUNTANT",
+           url="/payments/")
     return payment
 
 

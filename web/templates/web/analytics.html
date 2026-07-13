@@ -1,0 +1,52 @@
+{% extends "web/base.html" %}
+{% block title %}Analytics{% endblock %}
+{% block crumb %}<b>Analytics</b>{% endblock %}
+{% block content %}
+<h4 class="mb-3">Analytics</h4>
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-6">
+    <div class="card p-4 h-100">
+      <h6>Monthly spend</h6>
+      <table class="table table-sm mb-0">
+        <thead><tr><th>Month</th><th class="text-end">Committed spend</th></tr></thead>
+        <tbody>
+        {% for m in monthly %}
+          <tr><td>{{ m.month|date:"M Y" }}</td><td class="text-end">₹{{ m.total|floatformat:2 }}</td></tr>
+        {% empty %}<tr><td colspan="2" class="text-muted">No data.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card p-4 h-100">
+      <h6>Category analysis</h6>
+      <table class="table table-sm mb-0">
+        <thead><tr><th>Category</th><th class="text-end">Value</th></tr></thead>
+        <tbody>
+        {% for c in categories %}
+          <tr><td>{{ c.category }}</td><td class="text-end">₹{{ c.value|floatformat:2 }}</td></tr>
+        {% empty %}<tr><td colspan="2" class="text-muted">No data.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="card p-4">
+  <h6>Supplier performance</h6>
+  <div class="table-responsive">
+  <table class="table table-hover align-middle mb-0">
+    <thead><tr><th>Supplier</th><th>Rating</th><th class="text-end">Orders</th>
+      <th class="text-end">Total spend</th><th class="text-end">Disputes</th></tr></thead>
+    <tbody>
+    {% for s in performance %}
+      <tr><td>{{ s.vendor }}</td><td>{{ s.rating }}/5</td><td class="text-end">{{ s.orders }}</td>
+        <td class="text-end">₹{{ s.total|floatformat:2 }}</td>
+        <td class="text-end">{% if s.disputes %}<span class="badge badge-soft-red">{{ s.disputes }}</span>{% else %}0{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="5" class="text-muted text-center py-4">No supplier activity yet.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endblock %}

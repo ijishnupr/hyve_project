@@ -78,8 +78,8 @@ def test_po_pdf_renders(client, manager, project, vendor, material):
 
 
 def test_attachment_upload_via_api(api, project, vendor, material, manager):
-    from django.core.files.uploadedfile import SimpleUploadedFile
     from django.contrib.contenttypes.models import ContentType
+    from django.core.files.uploadedfile import SimpleUploadedFile
     po = _make_po(project, vendor, material, manager)
     ct = ContentType.objects.get(app_label="procurement", model="purchaseorder")
     f = SimpleUploadedFile("po.txt", b"hello", content_type="text/plain")

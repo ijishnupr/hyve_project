@@ -1,0 +1,22 @@
+{% extends "web/base.html" %}
+{% load web_extras %}
+{% block title %}Notifications{% endblock %}
+{% block crumb %}<b>Notifications</b>{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">Notifications</h4>
+  <form method="post" action="{% url 'web:notifications_read_all' %}">{% csrf_token %}
+    <button class="btn btn-outline-secondary btn-sm">Mark all read</button></form>
+</div>
+<div class="card"><div class="list-group list-group-flush">
+  {% for n in notes %}
+    <a href="{% url 'web:notification_read' n.pk %}" class="list-group-item d-flex justify-content-between align-items-center {% if not n.is_read %}fw-semibold{% endif %}"
+       style="background:transparent;border-color:var(--line);color:var(--ink)">
+      <span><span class="badge badge-soft-indigo me-2">{{ n.get_kind_display }}</span>{{ n.message }}</span>
+      <span class="text-muted small">{{ n.created_at|date:"d M H:i" }}{% if not n.is_read %} · <span class="text-danger">new</span>{% endif %}</span>
+    </a>
+  {% empty %}
+    <div class="p-4 text-muted text-center">No notifications.</div>
+  {% endfor %}
+</div></div>
+{% endblock %}

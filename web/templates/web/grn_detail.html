@@ -45,6 +45,8 @@
       </ul>
       {% if can_edit %}<a class="btn btn-outline-secondary btn-sm" href="{% url 'web:inspection_new' grn.pk %}">+ New inspection</a>{% endif %}
     </div>
+
+    {% include "web/_attachments.html" with att_model="goodsreceiptnote" att_object_id=grn.pk %}
   </div>
   <div class="col-lg-4">
     <div class="card p-3">

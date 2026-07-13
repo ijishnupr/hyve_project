@@ -58,6 +58,8 @@
         <a class="btn btn-outline-secondary btn-sm" href="{% url 'web:schedule_new' %}?bill={{ bill.pk }}">+ Schedule</a>
       {% endif %}
     </div>
+
+    {% include "web/_attachments.html" with att_model="vendorbill" att_object_id=bill.pk %}
   </div>
 
   <div class="col-lg-4">

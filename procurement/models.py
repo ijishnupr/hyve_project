@@ -1344,3 +1344,58 @@ class ContractLine(models.Model):
 
     def __str__(self) -> str:
         return f"{self.material} @ {self.unit_price}"
+
+
+# ---------------------------------------------------------------------------
+# Audit / History + Notifications
+# ---------------------------------------------------------------------------
+class AuditLog(TimeStampedModel):
+    """An immutable record of a user action / status change on any document."""
+
+    content_type = models.ForeignKey(
+        ContentType, null=True, blank=True, on_delete=models.SET_NULL)
+    object_id = models.PositiveIntegerField(null=True, blank=True)
+    document = GenericForeignKey("content_type", "object_id")
+
+    document_label = models.CharField(max_length=120, blank=True)
+    action = models.CharField(max_length=120)
+    from_status = models.CharField(max_length=32, blank=True)
+    to_status = models.CharField(max_length=32, blank=True)
+    note = models.TextField(blank=True)
+    actor = models.ForeignKey(
+        USER, null=True, blank=True, on_delete=models.SET_NULL, related_name="audit_logs")
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [models.Index(fields=["content_type", "object_id"])]
+
+    def __str__(self) -> str:
+        return f"{self.document_label}: {self.action}"
+
+
+class Notification(TimeStampedModel):
+    """An in-app notification. A null recipient means it targets a whole role."""
+
+    class Kind(models.TextChoices):
+        RFQ = "RFQ", "RFQ"
+        PO = "PO", "Purchase Order"
+        GRN = "GRN", "Goods Receipt"
+        INVOICE = "INVOICE", "Invoice"
+        PAYMENT = "PAYMENT", "Payment"
+        APPROVAL = "APPROVAL", "Approval"
+        CONTRACT = "CONTRACT", "Contract"
+        GENERAL = "GENERAL", "General"
+
+    recipient = models.ForeignKey(
+        USER, null=True, blank=True, on_delete=models.CASCADE, related_name="notifications")
+    recipient_role = models.CharField(max_length=32, blank=True)
+    kind = models.CharField(max_length=12, choices=Kind.choices, default=Kind.GENERAL)
+    message = models.CharField(max_length=255)
+    url = models.CharField(max_length=255, blank=True)
+    is_read = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.get_kind_display()}: {self.message}"

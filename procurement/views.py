@@ -1,12 +1,12 @@
 """API viewsets for the procurement module."""
 from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets
-from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError
+from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from . import services
+from . import reports, services
 from .filters import (
     GRNFilter,
     MaterialFilter,
@@ -22,20 +22,21 @@ from .models import (
     ApprovalRule,
     ApprovalStep,
     Attachment,
+    AuditLog,
     GoodsReceiptNote,
     Material,
     MaterialCategory,
-    PurchaseContract,
     Payment,
     PaymentSchedule,
-    PurchaseReturn,
-    QualityInspection,
-    StockItem,
-    StockLedgerEntry,
     Project,
+    PurchaseContract,
     PurchaseOrder,
     PurchaseRequisition,
+    PurchaseReturn,
+    QualityInspection,
     RequestForQuotation,
+    StockItem,
+    StockLedgerEntry,
     SupplierAddress,
     SupplierBankAccount,
     SupplierContact,
@@ -54,20 +55,22 @@ from .serializers import (
     ApprovalRuleSerializer,
     ApprovalStepSerializer,
     AttachmentSerializer,
-    PurchaseContractSerializer,
-    PaymentScheduleSerializer,
-    PaymentSerializer,
-    PurchaseReturnSerializer,
-    QualityInspectionSerializer,
-    StockItemSerializer,
-    StockLedgerEntrySerializer,
+    AuditLogSerializer,
     GoodsReceiptNoteSerializer,
     MaterialCategorySerializer,
     MaterialSerializer,
+    NotificationSerializer,
+    PaymentScheduleSerializer,
+    PaymentSerializer,
     ProjectSerializer,
+    PurchaseContractSerializer,
     PurchaseOrderSerializer,
     PurchaseRequisitionSerializer,
+    PurchaseReturnSerializer,
+    QualityInspectionSerializer,
     RequestForQuotationSerializer,
+    StockItemSerializer,
+    StockLedgerEntrySerializer,
     SupplierAddressSerializer,
     SupplierBankAccountSerializer,
     SupplierContactSerializer,
@@ -84,6 +87,20 @@ def _transition(fn, *args, **kwargs):
         return fn(*args, **kwargs)
     except services.TransitionError as exc:
         raise ValidationError(str(exc)) from exc
+
+
+@extend_schema(
+    responses={"200": {"type": "object"}},
+    description="Run a named procurement report and return its rows as JSON.",
+)
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def report_api(request, slug):
+    spec = reports.REPORTS.get(slug)
+    if not spec:
+        raise NotFound(f"Unknown report '{slug}'.")
+    title, fn, columns = spec
+    return Response({"report": slug, "title": title, "columns": columns, "rows": fn()})
 
 
 # ---------------------------------------------------------------------------
@@ -152,6 +169,31 @@ class AttachmentViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(uploaded_by=self.request.user)
+
+
+class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = AuditLog.objects.select_related("actor", "content_type").all()
+    serializer_class = AuditLogSerializer
+    permission_classes = [IsAuthenticated]
+    filterset_fields = ["content_type", "object_id", "action"]
+    ordering_fields = ["created_at"]
+
+
+class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = NotificationSerializer
+    permission_classes = [IsAuthenticated]
+    filterset_fields = ["kind", "is_read"]
+
+    def get_queryset(self):
+        return services.notifications_for(self.request.user)
+
+    @extend_schema(request=None, responses=NotificationSerializer)
+    @action(detail=True, methods=["post"], url_path="mark-read")
+    def mark_read(self, request, pk=None):
+        note = self.get_object()
+        note.is_read = True
+        note.save(update_fields=["is_read", "updated_at"])
+        return Response(self.get_serializer(note).data)
 
 
 class StockItemViewSet(viewsets.ReadOnlyModelViewSet):

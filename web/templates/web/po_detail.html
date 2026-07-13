@@ -12,6 +12,7 @@
   </div>
   <div>
     <a class="btn btn-outline-secondary btn-sm" href="{% url 'web:po_pdf' po.pk %}" target="_blank">Print PDF</a>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'web:audit_history' 'purchaseorder' po.pk %}">History</a>
     <a class="btn btn-outline-secondary btn-sm" href="{% url 'web:po_list' %}">Back</a>
   </div>
 </div>

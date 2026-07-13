@@ -5,18 +5,20 @@ from .models import (
     ApprovalRule,
     ApprovalStep,
     Attachment,
+    AuditLog,
     ContractLine,
     DocumentCounter,
     GoodsReceiptNote,
-    PurchaseContract,
     GRNLine,
     Material,
     MaterialCategory,
-    Project,
-    PurchaseOrder,
-    PurchaseOrderLine,
+    Notification,
     Payment,
     PaymentSchedule,
+    Project,
+    PurchaseContract,
+    PurchaseOrder,
+    PurchaseOrderLine,
     PurchaseRequisition,
     PurchaseRequisitionLine,
     PurchaseReturn,
@@ -28,11 +30,11 @@ from .models import (
     StockItem,
     StockLedgerEntry,
     SupplierAddress,
-    SupplierQuotation,
-    SupplierQuotationLine,
     SupplierBankAccount,
     SupplierContact,
     SupplierDocument,
+    SupplierQuotation,
+    SupplierQuotationLine,
     Vendor,
     VendorBill,
     VendorBillLine,
@@ -281,6 +283,19 @@ class AttachmentAdmin(admin.ModelAdmin):
     list_display = ("title", "kind", "content_type", "object_id", "uploaded_by", "created_at")
     list_filter = ("kind",)
     search_fields = ("title",)
+
+
+@admin.register(AuditLog)
+class AuditLogAdmin(admin.ModelAdmin):
+    list_display = ("created_at", "document_label", "action", "from_status", "to_status", "actor")
+    search_fields = ("document_label", "action")
+    list_filter = ("action",)
+
+
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    list_display = ("created_at", "kind", "message", "recipient", "recipient_role", "is_read")
+    list_filter = ("kind", "is_read")
 
 
 @admin.register(DocumentCounter)

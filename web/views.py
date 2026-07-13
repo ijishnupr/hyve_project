@@ -4,10 +4,12 @@ Thin layer over ``procurement.services`` — all state transitions delegate to t
 service functions (the same ones the API uses), so the business rules live in one
 place. Permissions mirror the DRF permission classes via role predicates on User.
 """
+from decimal import Decimal
 from functools import wraps
 
 from django.contrib import messages
-from django.contrib.auth import login as auth_login, logout as auth_logout
+from django.contrib.auth import login as auth_login
+from django.contrib.auth import logout as auth_logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.contenttypes.models import ContentType
@@ -19,22 +21,23 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 
-from procurement import reports, services
+from procurement import analytics, reports, services
 from procurement.models import (
     ApprovalRule,
     ApprovalStep,
     Attachment,
+    AuditLog,
     ContractLine,
     GoodsReceiptNote,
     GRNLine,
-    PurchaseContract,
     Material,
     MaterialCategory,
-    Project,
-    PurchaseOrder,
-    PurchaseOrderLine,
     Payment,
     PaymentSchedule,
+    Project,
+    PurchaseContract,
+    PurchaseOrder,
+    PurchaseOrderLine,
     PurchaseRequisition,
     PurchaseRequisitionLine,
     PurchaseReturn,
@@ -45,10 +48,6 @@ from procurement.models import (
     RFQLine,
     StockItem,
     StockLedgerEntry,
-    SupplierAddress,
-    SupplierBankAccount,
-    SupplierContact,
-    SupplierDocument,
     SupplierQuotation,
     SupplierQuotationLine,
     Vendor,
@@ -62,16 +61,16 @@ from .forms import (
     ContractLineForm,
     GoodsReceiptNoteForm,
     GRNLineForm,
-    PurchaseContractForm,
     MaterialCategoryForm,
     MaterialForm,
+    PaymentForm,
+    PaymentScheduleForm,
     ProjectForm,
+    PurchaseContractForm,
     PurchaseOrderForm,
     PurchaseOrderLineForm,
     PurchaseRequisitionForm,
     PurchaseRequisitionLineForm,
-    PaymentForm,
-    PaymentScheduleForm,
     PurchaseReturnForm,
     PurchaseReturnLineForm,
     QCChecklistItemForm,
@@ -79,11 +78,11 @@ from .forms import (
     RequestForQuotationForm,
     RFQLineForm,
     SupplierAddressForm,
-    SupplierQuotationForm,
-    SupplierQuotationLineForm,
     SupplierBankAccountForm,
     SupplierContactForm,
     SupplierDocumentForm,
+    SupplierQuotationForm,
+    SupplierQuotationLineForm,
     VendorBillForm,
     VendorBillLineForm,
     VendorForm,
@@ -236,6 +235,13 @@ def dashboard(request):
                           "action": "Ready to approve", "color": "blue",
                           "url": reverse("web:bill_detail", args=[bill.pk])})
 
+    trend = analytics.monthly_spend(6)
+    trend_max = max((r["total"] for r in trend), default=Decimal("0")) or Decimal("1")
+    trend_bars = [{
+        "month": r["month"], "total": r["total"],
+        "pct": int(min(100, (r["total"] / trend_max) * 100)),
+    } for r in trend]
+
     ctx = {
         "counts": {
             "projects": Project.objects.count(),
@@ -252,6 +258,9 @@ def dashboard(request):
             "payable": payable_value,
             "paid": paid_value,
         },
+        "pending": analytics.pending_counts(),
+        "top_suppliers": analytics.top_suppliers(5),
+        "trend_bars": trend_bars,
         "pr_status": _status_counts(PurchaseRequisition),
         "po_status": _status_counts(PurchaseOrder),
         "bill_status": _status_counts(VendorBill),
@@ -261,6 +270,16 @@ def dashboard(request):
         "recent_bills": VendorBill.objects.select_related("vendor")[:5],
     }
     return render(request, "web/dashboard.html", ctx)
+
+
+@login_required
+def analytics_view(request):
+    return render(request, "web/analytics.html", {
+        "monthly": analytics.monthly_spend(12),
+        "top_suppliers": analytics.top_suppliers(10),
+        "categories": analytics.category_spend(),
+        "performance": analytics.supplier_performance(),
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -709,7 +728,7 @@ def quotation_compare(request, rfq_pk):
     for mid, mat in materials.items():
         row = {"material": mat, "cells": []}
         for q in quotations:
-            ql = next((l for l in q.lines.all() if l.material_id == mid), None)
+            ql = next((qln for qln in q.lines.all() if qln.material_id == mid), None)
             row["cells"].append(ql)
         matrix.append(row)
     return render(request, "web/quotation_compare.html", {
@@ -911,7 +930,9 @@ def grn_detail(request, pk):
         GoodsReceiptNote.objects.select_related("purchase_order", "received_by")
         .prefetch_related("lines__po_line__material"), pk=pk)
     return render(request, "web/grn_detail.html", {"grn": grn,
-                  "can_edit": request.user.can_manage_procurement})
+                  "can_edit": request.user.can_manage_procurement,
+                  "attachments": attachments_for(grn),
+                  "attachment_form": AttachmentForm(initial={"kind": "DELIVERY_NOTE"})})
 
 
 @role_required("can_manage_procurement")
@@ -1065,7 +1086,9 @@ def bill_detail(request, pk):
         VendorBill.objects.select_related("vendor", "purchase_order", "created_by")
         .prefetch_related("lines__po_line__material", "payments", "schedules"), pk=pk)
     return render(request, "web/bill_detail.html", {"bill": bill,
-                  "can_edit": request.user.can_manage_bills})
+                  "can_edit": request.user.can_manage_bills,
+                  "attachments": attachments_for(bill),
+                  "attachment_form": AttachmentForm(initial={"kind": "INVOICE"})})
 
 
 @role_required("can_manage_bills")
@@ -1382,3 +1405,38 @@ def supplier_ledger_report(request):
     rows = reports.supplier_ledger(vendor) if vendor else []
     return render(request, "web/report_ledger.html", {
         "vendor": vendor, "vendors": Vendor.objects.all(), "rows": rows})
+
+
+# ---------------------------------------------------------------------------
+# Notifications + Audit history
+# ---------------------------------------------------------------------------
+@login_required
+def notification_list(request):
+    notes = services.notifications_for(request.user)[:100]
+    return render(request, "web/notification_list.html", {"notes": notes})
+
+
+@login_required
+def notification_read(request, pk):
+    note = services.notifications_for(request.user).filter(pk=pk).first()
+    if note:
+        note.is_read = True
+        note.save(update_fields=["is_read", "updated_at"])
+        if note.url:
+            return redirect(note.url)
+    return redirect("web:notification_list")
+
+
+@login_required
+def notifications_read_all(request):
+    services.notifications_for(request.user).filter(is_read=False).update(is_read=True)
+    messages.info(request, "All notifications marked read.")
+    return redirect("web:notification_list")
+
+
+@login_required
+def audit_history(request, model, object_id):
+    ct = get_object_or_404(ContentType, model=model, app_label="procurement")
+    logs = AuditLog.objects.filter(content_type=ct, object_id=object_id).select_related("actor")
+    obj = ct.model_class().objects.filter(pk=object_id).first()
+    return render(request, "web/audit_history.html", {"logs": logs, "obj": obj})

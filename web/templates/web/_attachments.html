@@ -1,0 +1,17 @@
+{# Reusable attachments card. Expects: attachments, attachment_form, att_model, att_object_id, can_edit #}
+<div class="card p-3 mt-3">
+  <h6>Attachments</h6>
+  <ul class="list-unstyled small">
+    {% for a in attachments %}
+      <li class="d-flex justify-content-between"><span>{{ a.get_kind_display }}: <a href="{{ a.file.url }}" target="_blank">{{ a.title }}</a></span>
+        {% if can_edit %}<a class="text-danger" href="{% url 'web:attachment_delete' a.pk %}">Remove</a>{% endif %}</li>
+    {% empty %}<li class="text-muted">No attachments.</li>{% endfor %}
+  </ul>
+  {% if can_edit %}
+  <form method="post" action="{% url 'web:attachment_add' att_model att_object_id %}" enctype="multipart/form-data" class="row g-2 align-items-end">
+    {% csrf_token %}
+    {% for f in attachment_form %}<div class="col-auto"><label class="form-label small">{{ f.label }}</label>{{ f }}</div>{% endfor %}
+    <div class="col-auto"><button class="btn btn-sm btn-outline-secondary">+ Upload</button></div>
+  </form>
+  {% endif %}
+</div>

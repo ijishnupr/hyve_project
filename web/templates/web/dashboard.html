@@ -40,6 +40,49 @@
   </div>
 </div>
 
+<!-- Pending queue KPIs -->
+<div class="row g-2 mb-4">
+  <div class="col-6 col-md-4 col-lg-2"><div class="card p-3 h-100 lift"><div class="stat-lbl mb-1">Pending RFQs</div><div class="stat-num" style="font-size:1.4rem">{{ pending.rfqs }}</div></div></div>
+  <div class="col-6 col-md-4 col-lg-2"><div class="card p-3 h-100 lift"><div class="stat-lbl mb-1">Draft POs</div><div class="stat-num" style="font-size:1.4rem">{{ pending.pos_draft }}</div></div></div>
+  <div class="col-6 col-md-4 col-lg-2"><a class="card p-3 h-100 lift d-block" href="{% url 'web:approval_inbox' %}"><div class="stat-lbl mb-1">Pending approvals</div><div class="stat-num" style="font-size:1.4rem">{{ pending.approvals }}</div></a></div>
+  <div class="col-6 col-md-4 col-lg-2"><div class="card p-3 h-100 lift"><div class="stat-lbl mb-1">Draft GRNs</div><div class="stat-num" style="font-size:1.4rem">{{ pending.grns }}</div></div></div>
+  <div class="col-6 col-md-4 col-lg-2"><div class="card p-3 h-100 lift"><div class="stat-lbl mb-1">Pending invoices</div><div class="stat-num" style="font-size:1.4rem">{{ pending.invoices }}</div></div></div>
+  <div class="col-6 col-md-4 col-lg-2"><a class="card p-3 h-100 lift d-block" href="{% url 'web:payment_list' %}"><div class="stat-lbl mb-1">Pending payments</div><div class="stat-num" style="font-size:1.4rem">{{ pending.payments }}</div></a></div>
+</div>
+
+<!-- Purchase trend + top suppliers -->
+<div class="row g-3 mb-4">
+  <div class="col-lg-8">
+    <div class="card p-4 h-100">
+      <h6><i class="bi bi-graph-up me-1"></i>Purchase trend (committed spend)</h6>
+      <div class="d-flex align-items-end gap-3" style="height:180px">
+        {% for b in trend_bars %}
+        <div class="d-flex flex-column align-items-center flex-grow-1" style="height:100%">
+          <div class="flex-grow-1 d-flex align-items-end w-100" style="justify-content:center">
+            <div title="₹{{ b.total }}" style="width:60%;background:linear-gradient(180deg,var(--accent),#5ac8fa);border-radius:8px 8px 0 0;height:{{ b.pct }}%;min-height:4px"></div>
+          </div>
+          <div class="text-muted mt-1" style="font-size:.7rem">{{ b.month|date:"M y" }}</div>
+        </div>
+        {% empty %}<div class="text-muted">No purchase data yet.</div>{% endfor %}
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card p-4 h-100">
+      <h6><i class="bi bi-trophy me-1"></i>Top suppliers</h6>
+      <table class="table table-sm align-middle mb-0">
+        <tbody>
+        {% for s in top_suppliers %}
+          <tr><td>{{ s.vendor }}<div class="text-muted" style="font-size:.72rem">{{ s.orders }} orders</div></td>
+            <td class="text-end fw-semibold">₹{{ s.total|floatformat:0 }}</td></tr>
+        {% empty %}<tr><td class="text-muted py-3 text-center">No data.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+      <a class="btn btn-outline-secondary btn-sm mt-2" href="{% url 'web:analytics' %}">Full analytics →</a>
+    </div>
+  </div>
+</div>
+
 <div class="row g-3 mb-4">
   <!-- Needs attention queue -->
   <div class="col-lg-5">

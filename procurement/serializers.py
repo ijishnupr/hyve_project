@@ -7,18 +7,20 @@ from .models import (
     ApprovalRule,
     ApprovalStep,
     Attachment,
+    AuditLog,
     ContractLine,
     GoodsReceiptNote,
     GRNLine,
-    PurchaseContract,
-    PurchaseOrderRevision,
     Material,
     MaterialCategory,
-    Project,
-    PurchaseOrder,
-    PurchaseOrderLine,
+    Notification,
     Payment,
     PaymentSchedule,
+    Project,
+    PurchaseContract,
+    PurchaseOrder,
+    PurchaseOrderLine,
+    PurchaseOrderRevision,
     PurchaseRequisition,
     PurchaseRequisitionLine,
     PurchaseReturn,
@@ -30,11 +32,11 @@ from .models import (
     StockItem,
     StockLedgerEntry,
     SupplierAddress,
-    SupplierQuotation,
-    SupplierQuotationLine,
     SupplierBankAccount,
     SupplierContact,
     SupplierDocument,
+    SupplierQuotation,
+    SupplierQuotationLine,
     Vendor,
     VendorBill,
     VendorBillLine,
@@ -83,6 +85,26 @@ class ApprovalRequestSerializer(serializers.ModelSerializer):
 
     def get_document_label(self, obj):
         return str(obj.document) if obj.document else None
+
+
+class AuditLogSerializer(serializers.ModelSerializer):
+    actor_name = serializers.CharField(source="actor.get_username", read_only=True)
+
+    class Meta:
+        model = AuditLog
+        fields = ["id", "content_type", "object_id", "document_label", "action",
+                  "from_status", "to_status", "note", "actor", "actor_name", "created_at"]
+        read_only_fields = fields
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    kind_display = serializers.CharField(source="get_kind_display", read_only=True)
+
+    class Meta:
+        model = Notification
+        fields = ["id", "kind", "kind_display", "message", "url", "is_read",
+                  "recipient", "recipient_role", "created_at"]
+        read_only_fields = fields
 
 
 class AttachmentSerializer(serializers.ModelSerializer):
