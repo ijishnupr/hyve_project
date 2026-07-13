@@ -1,0 +1,22 @@
+{% extends "web/base.html" %}
+{% load web_extras %}
+{% block title %}Stock Ledger{% endblock %}
+{% block crumb %}Inventory · <b>Stock ledger</b>{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">Stock Ledger</h4>
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'web:stock_list' %}">On hand</a>
+</div>
+<div class="card"><div class="table-responsive">
+<table class="table table-hover align-middle mb-0">
+  <thead><tr><th>When</th><th>Material</th><th>Project</th><th>Movement</th><th class="text-end">Qty</th><th class="text-end">Balance</th><th>Reference</th></tr></thead>
+  <tbody>
+  {% for e in entries %}
+    <tr><td>{{ e.created_at|date:"d M Y H:i" }}</td><td>{{ e.material.name }}</td><td>{{ e.project.name }}</td>
+      <td><span class="badge {% if e.quantity >= 0 %}badge-soft-green{% else %}badge-soft-red{% endif %}">{{ e.get_movement_display }}</span></td>
+      <td class="text-end">{{ e.quantity }}</td><td class="text-end">{{ e.balance_after }}</td><td class="small text-muted">{{ e.remarks }}</td></tr>
+  {% empty %}<tr><td colspan="7" class="text-muted text-center py-4">No movements yet.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div></div>
+{% endblock %}

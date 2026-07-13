@@ -1,0 +1,73 @@
+{% extends "web/base.html" %}
+{% load web_extras %}
+{% block title %}{{ contract.number }}{% endblock %}
+{% block crumb %}<a href="{% url 'web:contract_list' %}">Contracts</a> · <b>{{ contract.number }}</b>{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3">
+  <div>
+    <h4 class="mb-1">{{ contract.title }}
+      <span class="badge {{ contract.status|status_badge }} align-middle">{{ contract.get_status_display }}</span></h4>
+    <div class="text-muted small">{{ contract.number }} · {{ contract.vendor.name }} · {{ contract.get_contract_type_display }}
+      · {{ contract.start_date }} → {{ contract.end_date }}
+      {% if contract.renewed_from %}· renewed from {{ contract.renewed_from.number }}{% endif %}</div>
+  </div>
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'web:contract_list' %}">Back</a>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card p-3">
+      <h6>Contract pricing</h6>
+      <table class="table table-sm mb-0">
+        <thead><tr><th>Material</th><th class="text-end">Unit price</th><th class="text-end">Tax %</th><th class="text-end">Max qty</th></tr></thead>
+        <tbody>
+        {% for l in contract.lines.all %}
+          <tr><td>{{ l.material.name }}</td><td class="text-end">{{ l.unit_price }}</td>
+            <td class="text-end">{{ l.tax_rate }}</td><td class="text-end">{{ l.max_quantity|default:"—" }}</td></tr>
+        {% empty %}<tr><td colspan="4" class="text-muted">No pricing lines.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="card p-3 mt-3">
+      <h6>Purchase Orders under this contract</h6>
+      <ul class="list-unstyled mb-0 small">
+        {% for po in contract.purchase_orders.all %}
+          <li><a href="{% url 'web:po_detail' po.pk %}">{{ po.number }}</a> — {{ po.get_status_display }} ({{ po.total }})</li>
+        {% empty %}<li class="text-muted">None yet.</li>{% endfor %}
+      </ul>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card p-3 mb-3">
+      <h6>Value</h6>
+      <dl class="row small mb-0">
+        <dt class="col-6 text-muted fw-normal">Ceiling</dt><dd class="col-6 text-end">{{ contract.total_value }}</dd>
+        <dt class="col-6 text-muted fw-normal">Consumed</dt><dd class="col-6 text-end">{{ contract.consumed_value }}</dd>
+        <dt class="col-6 text-muted fw-normal">Remaining</dt><dd class="col-6 text-end">{{ contract.remaining_value }}</dd>
+      </dl>
+    </div>
+    <div class="card p-3">
+      <h6>Actions</h6>
+      {% if can_edit and contract.status == 'DRAFT' %}
+        <a class="btn btn-outline-secondary btn-sm w-100 mb-2" href="{% url 'web:contract_edit' contract.pk %}">Edit</a>
+      {% endif %}
+      {% if can_approve %}
+        {% if contract.status == 'DRAFT' %}
+          <form method="post" action="{% url 'web:contract_activate' contract.pk %}">{% csrf_token %}
+            <button class="btn btn-success btn-sm w-100 mb-2">Activate</button></form>
+        {% endif %}
+        {% if contract.status == 'ACTIVE' or contract.status == 'EXPIRED' %}
+          <form method="post" action="{% url 'web:contract_renew' contract.pk %}" class="mb-2">{% csrf_token %}
+            <label class="form-label small">Renew — new end date</label>
+            <input type="date" name="end_date" class="form-control form-control-sm mb-1" required>
+            <button class="btn btn-outline-secondary btn-sm w-100">Renew</button></form>
+        {% endif %}
+        {% if contract.status == 'ACTIVE' or contract.status == 'DRAFT' %}
+          <form method="post" action="{% url 'web:contract_terminate' contract.pk %}" onsubmit="return confirm('Terminate this contract?')">{% csrf_token %}
+            <button class="btn btn-outline-danger btn-sm w-100">Terminate</button></form>
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

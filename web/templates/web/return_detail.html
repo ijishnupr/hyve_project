@@ -1,0 +1,48 @@
+{% extends "web/base.html" %}
+{% load web_extras %}
+{% block title %}{{ ret.number }}{% endblock %}
+{% block crumb %}<a href="{% url 'web:return_list' %}">Returns</a> · <b>{{ ret.number }}</b>{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3">
+  <div>
+    <h4 class="mb-1">Return {{ ret.number }}
+      <span class="badge {{ ret.status|status_badge }} align-middle">{{ ret.get_status_display }}</span></h4>
+    <div class="text-muted small">{{ ret.get_resolution_display }} · {{ ret.vendor.name }} ·
+      against <a href="{% url 'web:po_detail' ret.purchase_order.pk %}">{{ ret.purchase_order.number }}</a></div>
+  </div>
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'web:return_list' %}">Back</a>
+</div>
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card p-3">
+      <h6>Returned lines</h6>
+      <table class="table table-sm">
+        <thead><tr><th>Material</th><th class="text-end">Quantity</th><th>Remarks</th></tr></thead>
+        <tbody>
+        {% for l in ret.lines.all %}
+          <tr><td>{{ l.po_line.material.name }}</td><td class="text-end">{{ l.quantity }}</td><td>{{ l.remarks }}</td></tr>
+        {% empty %}<tr><td colspan="3" class="text-muted">No lines.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+      {% if ret.reason %}<p class="small text-muted mb-0"><strong>Reason:</strong> {{ ret.reason }}</p>{% endif %}
+      {% if ret.credit_note_number %}<p class="small text-muted mb-0"><strong>Credit note:</strong> {{ ret.credit_note_number }}</p>{% endif %}
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card p-3">
+      <h6>Actions</h6>
+      {% if can_edit %}
+        {% if ret.status == 'DRAFT' %}
+          <form method="post" action="{% url 'web:return_confirm' ret.pk %}">{% csrf_token %}
+            <button class="btn btn-success btn-sm w-100 mb-2">Confirm return</button></form>
+          <form method="post" action="{% url 'web:return_cancel' ret.pk %}">{% csrf_token %}
+            <button class="btn btn-outline-danger btn-sm w-100">Cancel</button></form>
+        {% elif ret.status == 'CONFIRMED' %}
+          <form method="post" action="{% url 'web:return_cancel' ret.pk %}" onsubmit="return confirm('Reverse this confirmed return?')">{% csrf_token %}
+            <button class="btn btn-outline-danger btn-sm w-100">Cancel (reverse)</button></form>
+        {% else %}<p class="text-muted small mb-0">Cancelled.</p>{% endif %}
+      {% else %}<p class="text-muted small mb-0">Read-only.</p>{% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

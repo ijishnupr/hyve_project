@@ -1,0 +1,63 @@
+{% extends "web/base.html" %}
+{% load web_extras %}
+{% block title %}{{ inspection.number }}{% endblock %}
+{% block crumb %}<a href="{% url 'web:grn_detail' inspection.grn.pk %}">{{ inspection.grn.number }}</a> · <b>{{ inspection.number }}</b>{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3">
+  <div>
+    <h4 class="mb-1">Inspection {{ inspection.number }}
+      <span class="badge {{ inspection.status|status_badge }} align-middle">{{ inspection.get_status_display }}</span></h4>
+    <div class="text-muted small">GRN {{ inspection.grn.number }}</div>
+  </div>
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'web:grn_detail' inspection.grn.pk %}">Back</a>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card p-3">
+      <h6>Checklist</h6>
+      <table class="table table-sm mb-0">
+        <thead><tr><th>Check</th><th>Result</th><th>Remarks</th></tr></thead>
+        <tbody>
+        {% for it in inspection.items.all %}
+          <tr><td>{{ it.description }}</td>
+            <td><span class="badge {% if it.result == 'PASS' %}badge-soft-green{% elif it.result == 'FAIL' %}badge-soft-red{% else %}badge-soft-slate{% endif %}">{{ it.get_result_display }}</span></td>
+            <td class="small text-muted">{{ it.remarks }}</td></tr>
+        {% empty %}<tr><td colspan="3" class="text-muted">No checklist items.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+      {% if inspection.remarks %}<p class="small text-muted mt-2 mb-0">{{ inspection.remarks }}</p>{% endif %}
+    </div>
+
+    <div class="card p-3 mt-3">
+      <h6>Inspection images / reports</h6>
+      <ul class="list-unstyled small">
+        {% for a in attachments %}
+          <li class="d-flex justify-content-between"><a href="{{ a.file.url }}" target="_blank">{{ a.title }}</a>
+            {% if can_edit %}<a class="text-danger" href="{% url 'web:attachment_delete' a.pk %}">Remove</a>{% endif %}</li>
+        {% empty %}<li class="text-muted">No images uploaded.</li>{% endfor %}
+      </ul>
+      {% if can_edit %}
+      <form method="post" action="{% url 'web:attachment_add' 'qualityinspection' inspection.pk %}" enctype="multipart/form-data" class="row g-2 align-items-end">
+        {% csrf_token %}
+        {% for f in attachment_form %}<div class="col-auto"><label class="form-label small">{{ f.label }}</label>{{ f }}</div>{% endfor %}
+        <div class="col-auto"><button class="btn btn-sm btn-outline-secondary">+ Upload</button></div>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card p-3">
+      <h6>Actions</h6>
+      {% if inspection.status == 'PENDING' and can_edit %}
+        <form method="post" action="{% url 'web:inspection_submit' inspection.pk %}">{% csrf_token %}
+          <button class="btn btn-primary btn-sm w-100">Complete & record result</button></form>
+      {% else %}
+        <p class="small text-muted mb-0">
+          {% if inspection.inspected_by %}Inspected by {{ inspection.inspected_by.get_username }}<br>{{ inspection.inspected_at|date:"d M Y H:i" }}{% else %}No actions available.{% endif %}
+        </p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

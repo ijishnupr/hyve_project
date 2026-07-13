@@ -1,0 +1,38 @@
+{% extends "web/base.html" %}
+{% load web_extras %}
+{% block title %}Approvals{% endblock %}
+{% block crumb %}<b>Approvals</b>{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">My Pending Approvals</h4>
+  {% if request.user.can_manage_procurement %}
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'web:approval_rule_list' %}">Approval matrix</a>
+  {% endif %}
+</div>
+<div class="card"><div class="table-responsive">
+<table class="table table-hover align-middle mb-0">
+  <thead><tr><th>Document</th><th>Type</th><th class="text-end">Amount</th><th>Level</th><th>Role</th><th></th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td>{{ r.document|default:"—" }}</td>
+      <td>{{ r.step.request.get_document_type_display }}</td>
+      <td class="text-end">{{ r.step.request.amount }}</td>
+      <td>L{{ r.step.level }}{% if r.step.is_overdue %} <span class="badge badge-soft-red">Overdue</span>{% endif %}</td>
+      <td>{{ r.step.role_required }}</td>
+      <td class="text-end" style="min-width:260px">
+        <form method="post" action="{% url 'web:approval_step_approve' r.step.pk %}" class="d-inline-flex gap-1 align-items-center">
+          {% csrf_token %}
+          <input name="comments" class="form-control form-control-sm" placeholder="Comment" style="width:120px">
+          <button class="btn btn-success btn-sm">Approve</button>
+        </form>
+        <form method="post" action="{% url 'web:approval_step_reject' r.step.pk %}" class="d-inline">
+          {% csrf_token %}<button class="btn btn-outline-danger btn-sm">Reject</button>
+        </form>
+      </td>
+    </tr>
+  {% empty %}<tr><td colspan="6" class="text-muted text-center py-4">Nothing awaiting your approval.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div></div>
+{% endblock %}

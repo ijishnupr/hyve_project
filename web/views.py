@@ -10,30 +10,59 @@ from django.contrib import messages
 from django.contrib.auth import login as auth_login, logout as auth_logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
+from django.contrib.contenttypes.models import ContentType
 from django.db.models import Count, Sum
 from django.forms import inlineformset_factory
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse
+from django.utils import timezone
 
-from procurement import services
+from procurement import reports, services
 from procurement.models import (
+    ApprovalRule,
+    ApprovalStep,
+    Attachment,
+    ContractLine,
     GoodsReceiptNote,
     GRNLine,
+    PurchaseContract,
     Material,
     MaterialCategory,
     Project,
     PurchaseOrder,
     PurchaseOrderLine,
+    Payment,
+    PaymentSchedule,
     PurchaseRequisition,
     PurchaseRequisitionLine,
+    PurchaseReturn,
+    PurchaseReturnLine,
+    QCChecklistItem,
+    QualityInspection,
+    RequestForQuotation,
+    RFQLine,
+    StockItem,
+    StockLedgerEntry,
+    SupplierAddress,
+    SupplierBankAccount,
+    SupplierContact,
+    SupplierDocument,
+    SupplierQuotation,
+    SupplierQuotationLine,
     Vendor,
     VendorBill,
     VendorBillLine,
 )
 
 from .forms import (
+    ApprovalRuleForm,
+    AttachmentForm,
+    ContractLineForm,
     GoodsReceiptNoteForm,
     GRNLineForm,
+    PurchaseContractForm,
     MaterialCategoryForm,
     MaterialForm,
     ProjectForm,
@@ -41,6 +70,20 @@ from .forms import (
     PurchaseOrderLineForm,
     PurchaseRequisitionForm,
     PurchaseRequisitionLineForm,
+    PaymentForm,
+    PaymentScheduleForm,
+    PurchaseReturnForm,
+    PurchaseReturnLineForm,
+    QCChecklistItemForm,
+    QualityInspectionForm,
+    RequestForQuotationForm,
+    RFQLineForm,
+    SupplierAddressForm,
+    SupplierQuotationForm,
+    SupplierQuotationLineForm,
+    SupplierBankAccountForm,
+    SupplierContactForm,
+    SupplierDocumentForm,
     VendorBillForm,
     VendorBillLineForm,
     VendorForm,
@@ -90,6 +133,58 @@ def _run(request, fn, *args, success="Done.", **kwargs):
         messages.success(request, success)
     except services.TransitionError as exc:
         messages.error(request, str(exc))
+
+
+# ---------------------------------------------------------------------------
+# PDF rendering + generic attachments
+# ---------------------------------------------------------------------------
+def _render_pdf(request, template, context, filename):
+    """Render an HTML template to a downloadable PDF via WeasyPrint."""
+    from weasyprint import HTML
+
+    context.setdefault("now", timezone.now())
+    html = render_to_string(template, context, request=request)
+    pdf = HTML(string=html, base_url=request.build_absolute_uri("/")).write_pdf()
+    resp = HttpResponse(pdf, content_type="application/pdf")
+    resp["Content-Disposition"] = f'inline; filename="{filename}"'
+    return resp
+
+
+@login_required
+def attachment_add(request, model, object_id):
+    """Attach an uploaded file to any document identified by (model, object_id)."""
+    if not request.user.can_manage_procurement and not request.user.can_manage_bills:
+        messages.error(request, "You don't have permission to add attachments.")
+        return redirect(request.META.get("HTTP_REFERER") or "web:dashboard")
+    ct = get_object_or_404(ContentType, model=model, app_label="procurement")
+    form = AttachmentForm(request.POST, request.FILES)
+    if form.is_valid():
+        att = form.save(commit=False)
+        att.content_type = ct
+        att.object_id = object_id
+        att.uploaded_by = request.user
+        att.save()
+        messages.success(request, "Attachment uploaded.")
+    else:
+        messages.error(request, f"Upload failed: {form.errors.as_text()}")
+    return redirect(request.META.get("HTTP_REFERER") or "web:dashboard")
+
+
+@login_required
+def attachment_delete(request, pk):
+    att = get_object_or_404(Attachment, pk=pk)
+    if not request.user.can_manage_procurement and not request.user.can_manage_bills:
+        messages.error(request, "You don't have permission to remove attachments.")
+    else:
+        att.delete()
+        messages.info(request, "Attachment removed.")
+    return redirect(request.META.get("HTTP_REFERER") or "web:dashboard")
+
+
+def attachments_for(obj):
+    """Return the queryset of attachments for a model instance."""
+    ct = ContentType.objects.get_for_model(type(obj))
+    return Attachment.objects.filter(content_type=ct, object_id=obj.pk)
 
 
 # ---------------------------------------------------------------------------
@@ -217,14 +312,24 @@ def project_edit(request, pk):
 
 @login_required
 def vendor_list(request):
-    return _master_list(
-        request, title="Vendors", queryset=Vendor.objects.all(),
-        headers=["Code", "Name", "GSTIN", "Contact", "Terms (days)", "Active"],
-        row_fn=lambda o: [o.code, o.name, o.gstin, o.contact_person, o.payment_terms_days,
-                          "Yes" if o.is_active else "No"],
-        new_url=reverse("web:vendor_new"), edit_name="web:vendor_edit",
-        can_edit=request.user.can_manage_procurement,
-    )
+    vendors = Vendor.objects.all()
+    return render(request, "web/vendor_list.html", {
+        "vendors": vendors, "can_edit": request.user.can_manage_procurement})
+
+
+@login_required
+def vendor_detail(request, pk):
+    vendor = get_object_or_404(
+        Vendor.objects.prefetch_related(
+            "contacts", "addresses", "bank_accounts", "documents"), pk=pk)
+    can_edit = request.user.can_manage_procurement
+    return render(request, "web/vendor_detail.html", {
+        "vendor": vendor, "can_edit": can_edit,
+        "contact_form": SupplierContactForm(),
+        "address_form": SupplierAddressForm(),
+        "bank_form": SupplierBankAccountForm(),
+        "document_form": SupplierDocumentForm(),
+    })
 
 
 @role_required("can_manage_procurement")
@@ -236,6 +341,39 @@ def vendor_new(request):
 def vendor_edit(request, pk):
     return _master_form(request, title="Edit Vendor", form_class=VendorForm,
                         instance=get_object_or_404(Vendor, pk=pk), list_name="web:vendor_list")
+
+
+# -- supplier child records (contacts / addresses / banks / documents) --------
+_VENDOR_CHILD_FORMS = {
+    "contact": (SupplierContactForm, "contacts", "Contact"),
+    "address": (SupplierAddressForm, "addresses", "Address"),
+    "bank": (SupplierBankAccountForm, "bank_accounts", "Bank account"),
+    "document": (SupplierDocumentForm, "documents", "Document"),
+}
+
+
+@role_required("can_manage_procurement")
+def vendor_child_add(request, pk, kind):
+    vendor = get_object_or_404(Vendor, pk=pk)
+    form_class, related_name, label = _VENDOR_CHILD_FORMS[kind]
+    form = form_class(request.POST, request.FILES or None)
+    if form.is_valid():
+        obj = form.save(commit=False)
+        obj.vendor = vendor
+        obj.save()
+        messages.success(request, f"{label} added.")
+    else:
+        messages.error(request, f"Could not add {label.lower()}: {form.errors.as_text()}")
+    return redirect("web:vendor_detail", pk=pk)
+
+
+@role_required("can_manage_procurement")
+def vendor_child_delete(request, pk, kind, child_pk):
+    _form_class, related_name, label = _VENDOR_CHILD_FORMS[kind]
+    vendor = get_object_or_404(Vendor, pk=pk)
+    get_object_or_404(getattr(vendor, related_name), pk=child_pk).delete()
+    messages.info(request, f"{label} removed.")
+    return redirect("web:vendor_detail", pk=pk)
 
 
 @login_required
@@ -284,12 +422,69 @@ def material_edit(request, pk):
 
 
 # ---------------------------------------------------------------------------
+# Approval workflow
+# ---------------------------------------------------------------------------
+@login_required
+def approval_rule_list(request):
+    return _master_list(
+        request, title="Approval Matrix", queryset=ApprovalRule.objects.all(),
+        headers=["Name", "Document", "Level", "Role", "Min", "Max", "Active"],
+        row_fn=lambda o: [o.name, o.get_document_type_display(), o.level, o.role_required,
+                          o.min_amount, o.max_amount if o.max_amount is not None else "∞",
+                          "Yes" if o.is_active else "No"],
+        new_url=reverse("web:approval_rule_new"), edit_name="web:approval_rule_edit",
+        can_edit=request.user.can_manage_procurement,
+    )
+
+
+@role_required("can_manage_procurement")
+def approval_rule_new(request):
+    return _master_form(request, title="New Approval Rule", form_class=ApprovalRuleForm,
+                        list_name="web:approval_rule_list")
+
+
+@role_required("can_manage_procurement")
+def approval_rule_edit(request, pk):
+    return _master_form(request, title="Edit Approval Rule", form_class=ApprovalRuleForm,
+                        instance=get_object_or_404(ApprovalRule, pk=pk),
+                        list_name="web:approval_rule_list")
+
+
+@login_required
+def approval_inbox(request):
+    steps = services.pending_steps_for_user(request.user)
+    # Attach the linked document for display.
+    rows = [{"step": s, "document": s.request.document} for s in steps]
+    return render(request, "web/approval_inbox.html", {"rows": rows})
+
+
+@login_required
+def approval_step_approve(request, pk):
+    step = get_object_or_404(ApprovalStep, pk=pk)
+    _run(request, services.approve_step, step, user=request.user,
+         comments=request.POST.get("comments", ""), success="Approval recorded.")
+    return redirect("web:approval_inbox")
+
+
+@login_required
+def approval_step_reject(request, pk):
+    step = get_object_or_404(ApprovalStep, pk=pk)
+    _run(request, services.reject_step, step, user=request.user,
+         comments=request.POST.get("comments", ""), success="Step rejected.")
+    return redirect("web:approval_inbox")
+
+
+# ---------------------------------------------------------------------------
 # Inline formset factories
 # ---------------------------------------------------------------------------
 PRLineFS = inlineformset_factory(PurchaseRequisition, PurchaseRequisitionLine,
                                  form=PurchaseRequisitionLineForm, extra=3, can_delete=True)
 POLineFS = inlineformset_factory(PurchaseOrder, PurchaseOrderLine,
                                  form=PurchaseOrderLineForm, extra=3, can_delete=True)
+RFQLineFS = inlineformset_factory(RequestForQuotation, RFQLine,
+                                  form=RFQLineForm, extra=3, can_delete=True)
+QuotationLineFS = inlineformset_factory(SupplierQuotation, SupplierQuotationLine,
+                                        form=SupplierQuotationLineForm, extra=1, can_delete=True)
 
 
 def _style_formset(fs):
@@ -379,6 +574,171 @@ def pr_reject(request, pk):
 
 
 # ---------------------------------------------------------------------------
+# Request for Quotation (RFQ)
+# ---------------------------------------------------------------------------
+@role_required("can_manage_procurement")
+def pr_to_rfq(request, pk):
+    """Convert an APPROVED requisition into a draft RFQ."""
+    pr = get_object_or_404(PurchaseRequisition, pk=pk)
+    try:
+        rfq = services.create_rfq_from_requisition(pr, user=request.user)
+        messages.success(request, f"RFQ {rfq.number} created from {pr.number}.")
+        return redirect("web:rfq_detail", pk=rfq.pk)
+    except services.TransitionError as exc:
+        messages.error(request, str(exc))
+        return redirect("web:pr_detail", pk=pk)
+
+
+@login_required
+def rfq_list(request):
+    rfqs = RequestForQuotation.objects.select_related("project").prefetch_related("vendors")
+    return render(request, "web/rfq_list.html", {"rfqs": rfqs,
+                  "can_edit": request.user.can_manage_procurement})
+
+
+@login_required
+def rfq_detail(request, pk):
+    rfq = get_object_or_404(
+        RequestForQuotation.objects.select_related("project", "requisition", "created_by")
+        .prefetch_related("lines__material", "vendors"), pk=pk)
+    return render(request, "web/rfq_detail.html", {"rfq": rfq,
+                  "can_edit": request.user.can_manage_procurement})
+
+
+@role_required("can_manage_procurement")
+def rfq_new(request):
+    return _rfq_form(request, RequestForQuotation())
+
+
+@role_required("can_manage_procurement")
+def rfq_edit(request, pk):
+    rfq = get_object_or_404(RequestForQuotation, pk=pk)
+    if rfq.status != RequestForQuotation.Status.DRAFT:
+        messages.error(request, "Only draft RFQs can be edited.")
+        return redirect("web:rfq_detail", pk=pk)
+    return _rfq_form(request, rfq)
+
+
+def _rfq_form(request, rfq):
+    form = RequestForQuotationForm(request.POST or None, instance=rfq)
+    style_form(form)
+    formset = RFQLineFS(request.POST or None, instance=rfq)
+    _style_formset(formset)
+    if request.method == "POST" and form.is_valid() and formset.is_valid():
+        is_new = rfq.pk is None
+        if is_new:
+            rfq = form.save(commit=False)
+            rfq.created_by = request.user
+            rfq.save()
+            form.save_m2m()
+            formset.instance = rfq
+        else:
+            form.save()
+        formset.save()
+        messages.success(request, f"RFQ {rfq.number} saved.")
+        return redirect("web:rfq_detail", pk=rfq.pk)
+    return render(request, "web/document_form.html", {
+        "title": "Request for Quotation", "form": form, "formset": formset,
+        "line_label": "Materials to quote", "cancel_url": reverse("web:rfq_list"),
+    })
+
+
+@role_required("can_manage_procurement")
+def rfq_send(request, pk):
+    _run(request, services.send_rfq, get_object_or_404(RequestForQuotation, pk=pk),
+         user=request.user, success="RFQ sent to the selected suppliers.")
+    return redirect("web:rfq_detail", pk=pk)
+
+
+@role_required("can_manage_procurement")
+def rfq_close(request, pk):
+    _run(request, services.close_rfq, get_object_or_404(RequestForQuotation, pk=pk),
+         success="RFQ closed.")
+    return redirect("web:rfq_detail", pk=pk)
+
+
+@role_required("can_manage_procurement")
+def rfq_cancel(request, pk):
+    _run(request, services.cancel_rfq, get_object_or_404(RequestForQuotation, pk=pk),
+         success="RFQ cancelled.")
+    return redirect("web:rfq_detail", pk=pk)
+
+
+# ---------------------------------------------------------------------------
+# Supplier Quotations & comparison
+# ---------------------------------------------------------------------------
+@role_required("can_manage_procurement")
+def quotation_new(request, rfq_pk):
+    rfq = get_object_or_404(RequestForQuotation, pk=rfq_pk)
+    initial = [{"material": ln.material_id, "quantity": ln.quantity} for ln in rfq.lines.all()]
+    FS = inlineformset_factory(SupplierQuotation, SupplierQuotationLine,
+                               form=SupplierQuotationLineForm,
+                               extra=max(len(initial), 1), can_delete=True)
+    form = SupplierQuotationForm(request.POST or None, rfq=rfq)
+    style_form(form)
+    quotation = SupplierQuotation(rfq=rfq)
+    formset = FS(request.POST or None, instance=quotation,
+                 initial=None if request.method == "POST" else initial)
+    _style_formset(formset)
+    if request.method == "POST" and form.is_valid() and formset.is_valid():
+        quotation = form.save(commit=False)
+        quotation.rfq = rfq
+        quotation.created_by = request.user
+        quotation.save()
+        formset.instance = quotation
+        formset.save()
+        quotation.recalculate_totals()
+        messages.success(request, f"Quotation {quotation.number} recorded.")
+        return redirect("web:quotation_compare", rfq_pk=rfq.pk)
+    return render(request, "web/document_form.html", {
+        "title": f"Record Quotation — {rfq.number}", "form": form, "formset": formset,
+        "line_label": "Quoted lines (qty, unit price, tax %)",
+        "cancel_url": reverse("web:rfq_detail", args=[rfq.pk]),
+    })
+
+
+@login_required
+def quotation_compare(request, rfq_pk):
+    rfq = get_object_or_404(
+        RequestForQuotation.objects.prefetch_related(
+            "quotations__vendor", "quotations__lines__material", "lines__material"), pk=rfq_pk)
+    quotations = list(rfq.quotations.all())
+    # Build a per-material price matrix for easy side-by-side comparison.
+    materials = {ln.material_id: ln.material for ln in rfq.lines.all()}
+    matrix = []
+    for mid, mat in materials.items():
+        row = {"material": mat, "cells": []}
+        for q in quotations:
+            ql = next((l for l in q.lines.all() if l.material_id == mid), None)
+            row["cells"].append(ql)
+        matrix.append(row)
+    return render(request, "web/quotation_compare.html", {
+        "rfq": rfq, "quotations": quotations, "matrix": matrix,
+        "can_approve": request.user.can_approve,
+        "can_edit": request.user.can_manage_procurement,
+    })
+
+
+@role_required("can_approve")
+def quotation_select(request, pk):
+    quotation = get_object_or_404(SupplierQuotation, pk=pk)
+    try:
+        po = services.select_quotation(quotation, user=request.user)
+        messages.success(request, f"Quotation {quotation.number} selected — draft PO {po.number} created.")
+        return redirect("web:po_detail", pk=po.pk)
+    except services.TransitionError as exc:
+        messages.error(request, str(exc))
+        return redirect("web:quotation_compare", rfq_pk=quotation.rfq_id)
+
+
+@role_required("can_manage_procurement")
+def quotation_reject(request, pk):
+    quotation = get_object_or_404(SupplierQuotation, pk=pk)
+    _run(request, services.reject_quotation, quotation, success="Quotation rejected.")
+    return redirect("web:quotation_compare", rfq_pk=quotation.rfq_id)
+
+
+# ---------------------------------------------------------------------------
 # Purchase Order
 # ---------------------------------------------------------------------------
 @login_required
@@ -393,12 +753,67 @@ def po_detail(request, pk):
     po = get_object_or_404(
         PurchaseOrder.objects.select_related("vendor", "project", "created_by", "requisition")
         .prefetch_related("lines__material", "grns", "bills"), pk=pk)
+    approval = services.open_approval_for(po)
     return render(request, "web/po_detail.html", {"po": po,
                   "can_approve": request.user.can_approve,
                   "can_edit": request.user.can_manage_procurement,
                   "can_bill": request.user.can_manage_bills,
+                  "approval": approval,
+                  "attachments": attachments_for(po),
+                  "attachment_form": AttachmentForm(),
+                  "needs_approval": services.po_approval_rules_apply(po),
                   "receivable": po.status in {PurchaseOrder.Status.ISSUED,
                                               PurchaseOrder.Status.PARTIALLY_RECEIVED}})
+
+
+@role_required("can_manage_procurement")
+def po_submit_approval(request, pk):
+    _run(request, services.submit_po_for_approval, get_object_or_404(PurchaseOrder, pk=pk),
+         user=request.user, success="Purchase order submitted for approval.")
+    return redirect("web:po_detail", pk=pk)
+
+
+@role_required("can_approve")
+def po_reopen(request, pk):
+    _run(request, services.reopen_purchase_order, get_object_or_404(PurchaseOrder, pk=pk),
+         user=request.user, success="Purchase order re-opened for revision.")
+    return redirect("web:po_detail", pk=pk)
+
+
+@role_required("can_manage_procurement")
+def po_email(request, pk):
+    _run(request, services.email_purchase_order, get_object_or_404(PurchaseOrder, pk=pk),
+         success="Purchase order emailed to the vendor.")
+    return redirect("web:po_detail", pk=pk)
+
+
+@login_required
+def po_pdf(request, pk):
+    po = get_object_or_404(
+        PurchaseOrder.objects.select_related("vendor", "project")
+        .prefetch_related("lines__material"), pk=pk)
+    return _render_pdf(request, "web/pdf/po_pdf.html", {
+        "po": po, "doc_kind": "Purchase Order", "doc_number": po.number,
+        "status_label": po.get_status_display(),
+        "status_color": _po_status_color(po.status),
+    }, f"{po.number}.pdf")
+
+
+def _po_status_color(status):
+    from web.templatetags.web_extras import status_color
+    return status_color(status)
+
+
+@login_required
+def pr_pdf(request, pk):
+    pr = get_object_or_404(
+        PurchaseRequisition.objects.select_related("project", "requested_by", "approved_by")
+        .prefetch_related("lines__material"), pk=pk)
+    return _render_pdf(request, "web/pdf/pr_pdf.html", {
+        "pr": pr, "doc_kind": "Requisition", "doc_number": pr.number,
+        "status_label": pr.get_status_display(),
+        "status_color": _po_status_color(pr.status),
+    }, f"{pr.number}.pdf")
 
 
 @role_required("can_manage_procurement")
@@ -554,6 +969,85 @@ def grn_cancel(request, pk):
 
 
 # ---------------------------------------------------------------------------
+# Inventory — Stock on-hand + ledger
+# ---------------------------------------------------------------------------
+@login_required
+def stock_list(request):
+    items = StockItem.objects.select_related("material", "project")
+    project_id = request.GET.get("project")
+    if project_id:
+        items = items.filter(project_id=project_id)
+    return render(request, "web/stock_list.html", {
+        "items": items, "projects": Project.objects.all(),
+        "selected_project": project_id})
+
+
+@login_required
+def stock_ledger(request):
+    entries = StockLedgerEntry.objects.select_related("material", "project")[:300]
+    return render(request, "web/stock_ledger.html", {"entries": entries})
+
+
+# ---------------------------------------------------------------------------
+# Quality Inspection
+# ---------------------------------------------------------------------------
+QCItemFS = inlineformset_factory(QualityInspection, QCChecklistItem,
+                                 form=QCChecklistItemForm, extra=4, can_delete=True)
+
+_DEFAULT_QC_CHECKS = [
+    "Quantity matches challan", "No transit / physical damage",
+    "Correct specification / grade", "Packaging & labelling intact",
+]
+
+
+@role_required("can_manage_procurement")
+def inspection_new(request, grn_pk):
+    grn = get_object_or_404(GoodsReceiptNote, pk=grn_pk)
+    inspection = QualityInspection(grn=grn)
+    form = QualityInspectionForm(request.POST or None, instance=inspection)
+    style_form(form)
+    initial = [{"description": d} for d in _DEFAULT_QC_CHECKS]
+    FS = inlineformset_factory(QualityInspection, QCChecklistItem,
+                               form=QCChecklistItemForm,
+                               extra=len(initial) + 1, can_delete=True)
+    formset = FS(request.POST or None, instance=inspection,
+                 initial=None if request.method == "POST" else initial)
+    _style_formset(formset)
+    if request.method == "POST" and form.is_valid() and formset.is_valid():
+        inspection = form.save(commit=False)
+        inspection.grn = grn
+        inspection.save()
+        formset.instance = inspection
+        formset.save()
+        messages.success(request, f"Inspection {inspection.number} created.")
+        return redirect("web:inspection_detail", pk=inspection.pk)
+    return render(request, "web/document_form.html", {
+        "title": f"Quality Inspection — {grn.number}", "form": form, "formset": formset,
+        "line_label": "Checklist", "cancel_url": reverse("web:grn_detail", args=[grn.pk]),
+    })
+
+
+@login_required
+def inspection_detail(request, pk):
+    inspection = get_object_or_404(
+        QualityInspection.objects.select_related("grn", "inspected_by")
+        .prefetch_related("items"), pk=pk)
+    return render(request, "web/inspection_detail.html", {
+        "inspection": inspection,
+        "can_edit": request.user.can_manage_procurement,
+        "attachments": attachments_for(inspection),
+        "attachment_form": AttachmentForm(initial={"kind": "INSPECTION"}),
+    })
+
+
+@role_required("can_manage_procurement")
+def inspection_submit(request, pk):
+    _run(request, services.submit_inspection, get_object_or_404(QualityInspection, pk=pk),
+         user=request.user, success="Inspection completed.")
+    return redirect("web:inspection_detail", pk=pk)
+
+
+# ---------------------------------------------------------------------------
 # Vendor Bill (created scoped to a PO) — 3-way match
 # ---------------------------------------------------------------------------
 @login_required
@@ -569,7 +1063,7 @@ def bill_list(request):
 def bill_detail(request, pk):
     bill = get_object_or_404(
         VendorBill.objects.select_related("vendor", "purchase_order", "created_by")
-        .prefetch_related("lines__po_line__material"), pk=pk)
+        .prefetch_related("lines__po_line__material", "payments", "schedules"), pk=pk)
     return render(request, "web/bill_detail.html", {"bill": bill,
                   "can_edit": request.user.can_manage_bills})
 
@@ -630,3 +1124,261 @@ def bill_mark_paid(request, pk):
     _run(request, services.mark_bill_paid, get_object_or_404(VendorBill, pk=pk),
          success="Bill marked as paid.")
     return redirect("web:bill_detail", pk=pk)
+
+
+# ---------------------------------------------------------------------------
+# Supplier Payments
+# ---------------------------------------------------------------------------
+@login_required
+def payment_list(request):
+    payments = Payment.objects.select_related("vendor", "bill")
+    schedules = PaymentSchedule.objects.select_related("vendor", "bill").filter(
+        status=PaymentSchedule.Status.PENDING)
+    return render(request, "web/payment_list.html", {
+        "payments": payments, "schedules": schedules,
+        "can_edit": request.user.can_manage_bills})
+
+
+@role_required("can_manage_bills")
+def payment_new(request):
+    payment = Payment()
+    bill_id = request.GET.get("bill")
+    if bill_id and request.method == "GET":
+        bill = get_object_or_404(VendorBill, pk=bill_id)
+        payment.bill = bill
+        payment.vendor = bill.vendor
+        payment.purchase_order = bill.purchase_order
+        payment.amount = bill.outstanding
+        payment.payment_type = Payment.Type.AGAINST_BILL
+    form = PaymentForm(request.POST or None, instance=payment)
+    style_form(form)
+    if request.method == "POST" and form.is_valid():
+        payment = form.save(commit=False)
+        payment.created_by = request.user
+        payment.save()
+        messages.success(request, f"Payment {payment.number} recorded (pending).")
+        return redirect("web:payment_list")
+    return render(request, "web/master_form.html", {"title": "Record Payment", "form": form})
+
+
+@role_required("can_manage_bills")
+def payment_post(request, pk):
+    _run(request, services.post_payment, get_object_or_404(Payment, pk=pk),
+         success="Payment posted.")
+    return redirect("web:payment_list")
+
+
+@role_required("can_manage_bills")
+def payment_cancel(request, pk):
+    _run(request, services.cancel_payment, get_object_or_404(Payment, pk=pk),
+         success="Payment cancelled.")
+    return redirect("web:payment_list")
+
+
+@role_required("can_manage_bills")
+def schedule_new(request):
+    schedule = PaymentSchedule()
+    bill_id = request.GET.get("bill")
+    if bill_id and request.method == "GET":
+        bill = get_object_or_404(VendorBill, pk=bill_id)
+        schedule.bill = bill
+        schedule.vendor = bill.vendor
+        schedule.amount = bill.outstanding
+    form = PaymentScheduleForm(request.POST or None, instance=schedule)
+    style_form(form)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Payment schedule added.")
+        return redirect("web:payment_list")
+    return render(request, "web/master_form.html", {"title": "New Payment Schedule", "form": form})
+
+
+# ---------------------------------------------------------------------------
+# Purchase Returns
+# ---------------------------------------------------------------------------
+@login_required
+def return_list(request):
+    returns = PurchaseReturn.objects.select_related("purchase_order", "vendor")
+    return render(request, "web/return_list.html", {"returns": returns,
+                  "can_edit": request.user.can_manage_procurement})
+
+
+@login_required
+def return_detail(request, pk):
+    ret = get_object_or_404(
+        PurchaseReturn.objects.select_related("purchase_order", "vendor", "created_by")
+        .prefetch_related("lines__po_line__material"), pk=pk)
+    return render(request, "web/return_detail.html", {"ret": ret,
+                  "can_edit": request.user.can_manage_procurement})
+
+
+@role_required("can_manage_procurement")
+def return_new(request, po_pk):
+    po = get_object_or_404(PurchaseOrder, pk=po_pk)
+    received_lines = [ln for ln in po.lines.select_related("material") if ln.received_quantity > 0]
+    initial = [{"po_line": ln.pk, "quantity": ln.received_quantity} for ln in received_lines]
+    FS = inlineformset_factory(PurchaseReturn, PurchaseReturnLine,
+                               form=PurchaseReturnLineForm,
+                               extra=max(len(initial), 1), can_delete=True)
+    form = PurchaseReturnForm(request.POST or None)
+    style_form(form)
+    ret = PurchaseReturn(purchase_order=po, vendor=po.vendor)
+    formset = FS(request.POST or None, instance=ret,
+                 initial=None if request.method == "POST" else initial)
+    po_line_qs = po.lines.select_related("material")
+    for f in formset.forms:
+        f.fields["po_line"].queryset = po_line_qs
+    formset.empty_form.fields["po_line"].queryset = po_line_qs
+    _style_formset(formset)
+    if request.method == "POST" and form.is_valid() and formset.is_valid():
+        ret = form.save(commit=False)
+        ret.purchase_order = po
+        ret.vendor = po.vendor
+        ret.created_by = request.user
+        ret.save()
+        formset.instance = ret
+        formset.save()
+        messages.success(request, f"Return {ret.number} created (draft).")
+        return redirect("web:return_detail", pk=ret.pk)
+    return render(request, "web/document_form.html", {
+        "title": f"Purchase Return — against {po.number}", "form": form, "formset": formset,
+        "line_label": "Return lines (qty)", "cancel_url": reverse("web:po_detail", args=[po.pk]),
+    })
+
+
+@role_required("can_manage_procurement")
+def return_confirm(request, pk):
+    _run(request, services.confirm_return, get_object_or_404(PurchaseReturn, pk=pk),
+         success="Return confirmed; stock and PO quantities reversed.")
+    return redirect("web:return_detail", pk=pk)
+
+
+@role_required("can_manage_procurement")
+def return_cancel(request, pk):
+    _run(request, services.cancel_return, get_object_or_404(PurchaseReturn, pk=pk),
+         success="Return cancelled.")
+    return redirect("web:return_detail", pk=pk)
+
+
+# ---------------------------------------------------------------------------
+# Purchase Contracts
+# ---------------------------------------------------------------------------
+ContractLineFS = inlineformset_factory(PurchaseContract, ContractLine,
+                                       form=ContractLineForm, extra=3, can_delete=True)
+
+
+@login_required
+def contract_list(request):
+    contracts = PurchaseContract.objects.select_related("vendor")
+    return render(request, "web/contract_list.html", {"contracts": contracts,
+                  "can_edit": request.user.can_manage_procurement})
+
+
+@login_required
+def contract_detail(request, pk):
+    contract = get_object_or_404(
+        PurchaseContract.objects.select_related("vendor", "created_by")
+        .prefetch_related("lines__material", "purchase_orders"), pk=pk)
+    return render(request, "web/contract_detail.html", {"contract": contract,
+                  "can_edit": request.user.can_manage_procurement,
+                  "can_approve": request.user.can_approve})
+
+
+@role_required("can_manage_procurement")
+def contract_new(request):
+    return _contract_form(request, PurchaseContract())
+
+
+@role_required("can_manage_procurement")
+def contract_edit(request, pk):
+    contract = get_object_or_404(PurchaseContract, pk=pk)
+    if contract.status not in {PurchaseContract.Status.DRAFT, PurchaseContract.Status.ACTIVE}:
+        messages.error(request, "Only draft or active contracts can be edited.")
+        return redirect("web:contract_detail", pk=pk)
+    return _contract_form(request, contract)
+
+
+def _contract_form(request, contract):
+    form = PurchaseContractForm(request.POST or None, instance=contract)
+    style_form(form)
+    formset = ContractLineFS(request.POST or None, instance=contract)
+    _style_formset(formset)
+    if request.method == "POST" and form.is_valid() and formset.is_valid():
+        is_new = contract.pk is None
+        if is_new:
+            contract = form.save(commit=False)
+            contract.created_by = request.user
+            contract.save()
+            formset.instance = contract
+        else:
+            form.save()
+        formset.save()
+        messages.success(request, f"Contract {contract.number} saved.")
+        return redirect("web:contract_detail", pk=contract.pk)
+    return render(request, "web/document_form.html", {
+        "title": "Purchase Contract", "form": form, "formset": formset,
+        "line_label": "Contract pricing (material, unit price, tax %)",
+        "cancel_url": reverse("web:contract_list"),
+    })
+
+
+@role_required("can_approve")
+def contract_activate(request, pk):
+    _run(request, services.activate_contract, get_object_or_404(PurchaseContract, pk=pk),
+         success="Contract activated.")
+    return redirect("web:contract_detail", pk=pk)
+
+
+@role_required("can_approve")
+def contract_terminate(request, pk):
+    _run(request, services.terminate_contract, get_object_or_404(PurchaseContract, pk=pk),
+         success="Contract terminated.")
+    return redirect("web:contract_detail", pk=pk)
+
+
+@role_required("can_approve")
+def contract_renew(request, pk):
+    contract = get_object_or_404(PurchaseContract, pk=pk)
+    start = request.POST.get("start_date") or contract.end_date
+    end = request.POST.get("end_date")
+    if not end:
+        messages.error(request, "Provide a new end date to renew.")
+        return redirect("web:contract_detail", pk=pk)
+    try:
+        new = services.renew_contract(contract, start_date=start, end_date=end, user=request.user)
+        messages.success(request, f"Contract renewed as {new.number}.")
+        return redirect("web:contract_detail", pk=new.pk)
+    except services.TransitionError as exc:
+        messages.error(request, str(exc))
+        return redirect("web:contract_detail", pk=pk)
+
+
+# ---------------------------------------------------------------------------
+# Reports
+# ---------------------------------------------------------------------------
+@login_required
+def reports_index(request):
+    items = [{"slug": slug, "title": spec[0]} for slug, spec in reports.REPORTS.items()]
+    return render(request, "web/reports_index.html", {
+        "items": items, "vendors": Vendor.objects.all()})
+
+
+@login_required
+def report_view(request, slug):
+    spec = reports.REPORTS.get(slug)
+    if not spec:
+        messages.error(request, "Unknown report.")
+        return redirect("web:reports_index")
+    title, fn, columns = spec
+    rows = fn()
+    return render(request, "web/report_table.html", {
+        "title": title, "columns": columns, "rows": rows})
+
+
+@login_required
+def supplier_ledger_report(request):
+    vendor_id = request.GET.get("vendor")
+    vendor = get_object_or_404(Vendor, pk=vendor_id) if vendor_id else None
+    rows = reports.supplier_ledger(vendor) if vendor else []
+    return render(request, "web/report_ledger.html", {
+        "vendor": vendor, "vendors": Vendor.objects.all(), "rows": rows})

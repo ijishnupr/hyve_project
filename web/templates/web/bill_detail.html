@@ -41,6 +41,23 @@
       <pre class="small mb-0" style="white-space:pre-wrap">{{ bill.match_notes }}</pre>
     </div>
     {% endif %}
+
+    <div class="card p-3 mt-3">
+      <h6>Payments <span class="text-muted small">· outstanding {{ bill.outstanding }}</span></h6>
+      <table class="table table-sm mb-2">
+        <thead><tr><th>Number</th><th>Method</th><th class="text-end">Amount</th><th>Date</th><th>Status</th></tr></thead>
+        <tbody>
+        {% for p in bill.payments.all %}
+          <tr><td>{{ p.number }}</td><td>{{ p.get_method_display }}</td><td class="text-end">{{ p.amount }}</td>
+            <td>{{ p.payment_date }}</td><td><span class="badge {{ p.status|status_badge }}">{{ p.get_status_display }}</span></td></tr>
+        {% empty %}<tr><td colspan="5" class="text-muted">No payments yet.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+      {% if can_edit and bill.outstanding > 0 %}
+        <a class="btn btn-outline-secondary btn-sm" href="{% url 'web:payment_new' %}?bill={{ bill.pk }}">+ Record payment</a>
+        <a class="btn btn-outline-secondary btn-sm" href="{% url 'web:schedule_new' %}?bill={{ bill.pk }}">+ Schedule</a>
+      {% endif %}
+    </div>
   </div>
 
   <div class="col-lg-4">

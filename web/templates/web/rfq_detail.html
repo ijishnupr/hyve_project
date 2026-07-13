@@ -1,0 +1,65 @@
+{% extends "web/base.html" %}
+{% load web_extras %}
+{% block title %}{{ rfq.number }}{% endblock %}
+{% block crumb %}<a href="{% url 'web:rfq_list' %}">RFQs</a> · <b>{{ rfq.number }}</b>{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3">
+  <div>
+    <h4 class="mb-1">RFQ {{ rfq.number }}
+      <span class="badge {{ rfq.status|status_badge }} align-middle">{{ rfq.get_status_display }}</span></h4>
+    <div class="text-muted small">{{ rfq.project }}{% if rfq.requisition %} · from {{ rfq.requisition.number }}{% endif %}</div>
+  </div>
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'web:rfq_list' %}">Back</a>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card p-3 mb-3">
+      <h6>Materials to quote</h6>
+      <table class="table table-sm">
+        <thead><tr><th>Material</th><th class="text-end">Quantity</th><th>Remarks</th></tr></thead>
+        <tbody>
+        {% for l in rfq.lines.all %}
+          <tr><td>{{ l.material.name }}</td><td class="text-end">{{ l.quantity }}</td><td>{{ l.remarks }}</td></tr>
+        {% empty %}<tr><td colspan="3" class="text-muted">No lines.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="card p-3">
+      <h6>Suppliers invited</h6>
+      {% for v in rfq.vendors.all %}
+        <span class="badge badge-soft-indigo me-1 mb-1">{{ v.name }}</span>
+      {% empty %}<p class="text-muted small mb-0">No suppliers selected.</p>{% endfor %}
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card p-3">
+      <h6>Actions</h6>
+      {% if can_edit %}
+        {% if rfq.status == 'DRAFT' %}
+          <a class="btn btn-outline-secondary btn-sm w-100 mb-2" href="{% url 'web:rfq_edit' rfq.pk %}">Edit</a>
+          <form method="post" action="{% url 'web:rfq_send' rfq.pk %}">{% csrf_token %}
+            <button class="btn btn-primary btn-sm w-100 mb-2">Send to suppliers</button></form>
+          <form method="post" action="{% url 'web:rfq_cancel' rfq.pk %}">{% csrf_token %}
+            <button class="btn btn-outline-danger btn-sm w-100">Cancel</button></form>
+        {% elif rfq.status == 'SENT' %}
+          <a class="btn btn-dark btn-sm w-100 mb-2" href="{% url 'web:quotation_new' rfq.pk %}">Record quotation</a>
+          <a class="btn btn-outline-secondary btn-sm w-100 mb-2" href="{% url 'web:quotation_compare' rfq.pk %}">Compare quotations ({{ rfq.quotations.count }})</a>
+          <form method="post" action="{% url 'web:rfq_close' rfq.pk %}">{% csrf_token %}
+            <button class="btn btn-success btn-sm w-100 mb-2">Close RFQ</button></form>
+          <form method="post" action="{% url 'web:rfq_cancel' rfq.pk %}">{% csrf_token %}
+            <button class="btn btn-outline-danger btn-sm w-100">Cancel</button></form>
+        {% else %}
+          <p class="text-muted small mb-0">No actions in <strong>{{ rfq.get_status_display }}</strong>.</p>
+        {% endif %}
+      {% endif %}
+      <hr>
+      <div class="small text-muted">
+        Issued {{ rfq.issue_date }}<br>
+        {% if rfq.response_deadline %}Deadline {{ rfq.response_deadline }}<br>{% endif %}
+        {% if rfq.sent_at %}Sent {{ rfq.sent_at|date:"d M Y H:i" }}{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

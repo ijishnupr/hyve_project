@@ -31,6 +31,26 @@ def accountant(db):
 
 
 @pytest.fixture
+def admin_user(db):
+    return User.objects.create_user(
+        username="admin_u",
+        email="admin_u@example.com",
+        password="pass12345",
+        role="ADMIN",
+    )
+
+
+@pytest.fixture
+def site_engineer(db):
+    return User.objects.create_user(
+        username="engineer",
+        email="eng@example.com",
+        password="pass12345",
+        role="SITE_ENGINEER",
+    )
+
+
+@pytest.fixture
 def viewer(db):
     return User.objects.create_user(
         username="viewer",

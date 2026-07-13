@@ -1,0 +1,28 @@
+{% extends "web/base.html" %}
+{% block title %}Stock{% endblock %}
+{% block crumb %}Inventory · <b>Stock on hand</b>{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">Stock on Hand</h4>
+  <div class="d-flex gap-2">
+    <form method="get" class="d-flex gap-2">
+      <select name="project" class="form-select form-select-sm" onchange="this.form.submit()">
+        <option value="">All projects</option>
+        {% for p in projects %}<option value="{{ p.id }}" {% if selected_project == p.id|stringformat:'s' %}selected{% endif %}>{{ p.name }}</option>{% endfor %}
+      </select>
+    </form>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'web:stock_ledger' %}">Stock ledger</a>
+  </div>
+</div>
+<div class="card"><div class="table-responsive">
+<table class="table table-hover align-middle mb-0">
+  <thead><tr><th>Material</th><th>Project / Site</th><th>Unit</th><th class="text-end">On hand</th></tr></thead>
+  <tbody>
+  {% for i in items %}
+    <tr><td>{{ i.material.name }}</td><td>{{ i.project.name }}</td>
+      <td>{{ i.material.get_unit_display }}</td><td class="text-end">{{ i.quantity_on_hand }}</td></tr>
+  {% empty %}<tr><td colspan="4" class="text-muted text-center py-4">No stock recorded yet — confirm a GRN to receive materials.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div></div>
+{% endblock %}

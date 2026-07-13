@@ -9,7 +9,10 @@
       <span class="badge {{ pr.status|status_badge }} align-middle">{{ pr.get_status_display }}</span></h4>
     <div class="text-muted small">{{ pr.project }} · raised by {{ pr.requested_by.get_username }}</div>
   </div>
-  <a class="btn btn-outline-secondary btn-sm" href="{% url 'web:pr_list' %}">Back</a>
+  <div>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'web:pr_pdf' pr.pk %}" target="_blank">Print PDF</a>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'web:pr_list' %}">Back</a>
+  </div>
 </div>
 
 <div class="row g-3">
@@ -44,6 +47,8 @@
           <input name="reason" class="form-control form-control-sm mb-2" placeholder="Rejection reason">
           <button class="btn btn-outline-danger btn-sm w-100">Reject</button></form>
       {% elif pr.status == 'APPROVED' and can_edit %}
+        <form method="post" action="{% url 'web:pr_to_rfq' pr.pk %}">{% csrf_token %}
+          <button class="btn btn-primary btn-sm w-100 mb-2">Convert to RFQ</button></form>
         <a class="btn btn-dark btn-sm w-100" href="{% url 'web:po_new' %}?requisition={{ pr.pk }}">Convert to Purchase Order</a>
       {% else %}
         <p class="text-muted small mb-0">No actions available in <strong>{{ pr.get_status_display }}</strong> state.</p>

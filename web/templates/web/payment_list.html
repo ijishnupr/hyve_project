@@ -1,0 +1,58 @@
+{% extends "web/base.html" %}
+{% load web_extras %}
+{% block title %}Payments{% endblock %}
+{% block crumb %}Finance · <b>Supplier Payments</b>{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">Supplier Payments</h4>
+  {% if can_edit %}
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'web:schedule_new' %}">+ Schedule</a>
+    <a class="btn btn-dark btn-sm" href="{% url 'web:payment_new' %}">+ Record Payment</a>
+  </div>
+  {% endif %}
+</div>
+
+{% if schedules %}
+<div class="card p-3 mb-3">
+  <h6>Upcoming payment schedule</h6>
+  <table class="table table-sm mb-0">
+    <thead><tr><th>Vendor</th><th>Bill</th><th>Due</th><th class="text-end">Amount</th></tr></thead>
+    <tbody>
+    {% for s in schedules %}
+      <tr><td>{{ s.vendor.name }}</td><td>{{ s.bill.number|default:"—" }}</td>
+        <td>{{ s.due_date }}{% if s.is_overdue %} <span class="badge badge-soft-red">Overdue</span>{% endif %}</td>
+        <td class="text-end">{{ s.amount }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<div class="card"><div class="table-responsive">
+<table class="table table-hover align-middle mb-0">
+  <thead><tr><th>Number</th><th>Vendor</th><th>Bill</th><th>Type</th><th>Method</th>
+    <th class="text-end">Amount</th><th>Date</th><th>Status</th><th></th></tr></thead>
+  <tbody>
+  {% for p in payments %}
+    <tr>
+      <td>{{ p.number }}</td><td>{{ p.vendor.name }}</td><td>{{ p.bill.number|default:"—" }}</td>
+      <td>{{ p.get_payment_type_display }}</td><td>{{ p.get_method_display }}</td>
+      <td class="text-end">{{ p.amount }}</td><td>{{ p.payment_date }}</td>
+      <td><span class="badge {{ p.status|status_badge }}">{{ p.get_status_display }}</span></td>
+      <td class="text-end">
+        {% if can_edit %}
+          {% if p.status == 'PENDING' %}
+            <form method="post" action="{% url 'web:payment_post' p.pk %}" class="d-inline">{% csrf_token %}<button class="btn btn-success btn-sm">Post</button></form>
+          {% endif %}
+          {% if p.status != 'CANCELLED' %}
+            <form method="post" action="{% url 'web:payment_cancel' p.pk %}" class="d-inline">{% csrf_token %}<button class="btn btn-outline-danger btn-sm">Cancel</button></form>
+          {% endif %}
+        {% endif %}
+      </td>
+    </tr>
+  {% empty %}<tr><td colspan="9" class="text-muted text-center py-4">No payments recorded.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div></div>
+{% endblock %}

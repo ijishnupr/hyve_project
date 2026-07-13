@@ -34,6 +34,17 @@
       {% endif %}
       {% if grn.notes %}<p class="small text-muted mb-0">{{ grn.notes }}</p>{% endif %}
     </div>
+
+    <div class="card p-3 mt-3">
+      <h6>Quality Inspections</h6>
+      <ul class="list-unstyled mb-2 small">
+        {% for i in grn.inspections.all %}
+          <li><a href="{% url 'web:inspection_detail' i.pk %}">{{ i.number }}</a> —
+            <span class="badge {{ i.status|status_badge }}">{{ i.get_status_display }}</span></li>
+        {% empty %}<li class="text-muted">No inspections yet.</li>{% endfor %}
+      </ul>
+      {% if can_edit %}<a class="btn btn-outline-secondary btn-sm" href="{% url 'web:inspection_new' grn.pk %}">+ New inspection</a>{% endif %}
+    </div>
   </div>
   <div class="col-lg-4">
     <div class="card p-3">

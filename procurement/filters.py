@@ -6,6 +6,8 @@ from .models import (
     Material,
     PurchaseOrder,
     PurchaseRequisition,
+    RequestForQuotation,
+    SupplierQuotation,
     Vendor,
     VendorBill,
 )
@@ -34,6 +36,18 @@ class PurchaseRequisitionFilter(filters.FilterSet):
     class Meta:
         model = PurchaseRequisition
         fields = ["status", "project", "requested_by"]
+
+
+class RFQFilter(filters.FilterSet):
+    class Meta:
+        model = RequestForQuotation
+        fields = ["status", "project", "vendors"]
+
+
+class SupplierQuotationFilter(filters.FilterSet):
+    class Meta:
+        model = SupplierQuotation
+        fields = ["status", "rfq", "vendor"]
 
 
 class PurchaseOrderFilter(filters.FilterSet):

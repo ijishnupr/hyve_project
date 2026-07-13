@@ -1,0 +1,20 @@
+{% extends "web/base.html" %}
+{% load web_extras %}
+{% block title %}{{ title }}{% endblock %}
+{% block crumb %}<a href="{% url 'web:reports_index' %}">Reports</a> · <b>{{ title }}</b>{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">{{ title }}</h4>
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'web:reports_index' %}">All reports</a>
+</div>
+<div class="card"><div class="table-responsive">
+<table class="table table-hover align-middle mb-0">
+  <thead><tr>{% for c in columns %}<th>{{ c|title }}</th>{% endfor %}</tr></thead>
+  <tbody>
+  {% for row in rows %}
+    <tr>{% for c in columns %}<td>{{ row|dictkey:c }}</td>{% endfor %}</tr>
+  {% empty %}<tr><td colspan="{{ columns|length }}" class="text-muted text-center py-4">No data.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div></div>
+{% endblock %}

@@ -198,9 +198,16 @@
       <li><a class="nav-link {% if 'material' in u %}active{% endif %}" href="{% url 'web:material_list' %}"><i class="bi bi-box-seam"></i> Materials</a></li>
       <li class="sect">Procure-to-pay</li>
       <li><a class="nav-link {% if u|slice:':3' == 'pr_' %}active{% endif %}" href="{% url 'web:pr_list' %}"><i class="bi bi-file-earmark-text"></i> Requisitions</a></li>
+      <li><a class="nav-link {% if 'rfq' in u or 'quotation' in u %}active{% endif %}" href="{% url 'web:rfq_list' %}"><i class="bi bi-envelope-paper"></i> RFQs & Quotations</a></li>
+      <li><a class="nav-link {% if 'contract' in u %}active{% endif %}" href="{% url 'web:contract_list' %}"><i class="bi bi-file-earmark-ruled"></i> Contracts</a></li>
       <li><a class="nav-link {% if u|slice:':3' == 'po_' %}active{% endif %}" href="{% url 'web:po_list' %}"><i class="bi bi-cart3"></i> Purchase Orders</a></li>
       <li><a class="nav-link {% if 'grn' in u %}active{% endif %}" href="{% url 'web:grn_list' %}"><i class="bi bi-clipboard-check"></i> Goods Receipts</a></li>
+      <li><a class="nav-link {% if 'stock' in u %}active{% endif %}" href="{% url 'web:stock_list' %}"><i class="bi bi-boxes"></i> Inventory / Stock</a></li>
+      <li><a class="nav-link {% if 'return' in u %}active{% endif %}" href="{% url 'web:return_list' %}"><i class="bi bi-arrow-return-left"></i> Purchase Returns</a></li>
       <li><a class="nav-link {% if 'bill' in u %}active{% endif %}" href="{% url 'web:bill_list' %}"><i class="bi bi-receipt"></i> Vendor Bills</a></li>
+      <li><a class="nav-link {% if 'payment' in u or 'schedule' in u %}active{% endif %}" href="{% url 'web:payment_list' %}"><i class="bi bi-cash-coin"></i> Payments</a></li>
+      <li class="sect">Governance</li>
+      <li><a class="nav-link {% if 'approval' in u %}active{% endif %}" href="{% url 'web:approval_inbox' %}"><i class="bi bi-check2-square"></i> Approvals</a></li>
     </ul>
   </aside>
   <div class="main">

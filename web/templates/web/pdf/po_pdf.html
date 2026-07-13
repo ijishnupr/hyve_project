@@ -1,0 +1,46 @@
+{% extends "web/pdf/base_pdf.html" %}
+{% block body %}
+<table class="meta"><tr>
+  <td><div class="panel">
+    <div class="lbl">Vendor</div>
+    <div class="val big">{{ po.vendor.name }}</div>
+    <div class="val">{{ po.vendor.code }}{% if po.vendor.gstin %} · GSTIN {{ po.vendor.gstin }}{% endif %}</div>
+    {% if po.vendor.address %}<div class="val">{{ po.vendor.address }}</div>{% endif %}
+  </div></td>
+  <td><div class="panel">
+    <div class="lbl">Order details</div>
+    <div class="val">Project: <b>{{ po.project.name }}</b></div>
+    <div class="val">Order date: {{ po.order_date|date:"d M Y" }}</div>
+    <div class="val">Expected delivery: {{ po.expected_delivery_date|date:"d M Y"|default:"—" }}</div>
+    <div class="val">Payment terms: {{ po.payment_terms_days }} days</div>
+    <div class="val">Revision: {{ po.revision }}</div>
+  </div></td>
+</tr></table>
+
+<table class="lines">
+  <thead><tr><th style="width:6%">#</th><th>Material</th><th class="r">Qty</th><th class="r">Unit price</th><th class="r">Tax %</th><th class="r">Line total</th></tr></thead>
+  <tbody>
+  {% for l in po.lines.all %}
+    <tr><td>{{ forloop.counter }}</td><td>{{ l.material.name }}</td>
+      <td class="r">{{ l.quantity }}</td><td class="r">{{ l.unit_price }}</td>
+      <td class="r">{{ l.tax_rate }}</td><td class="r">{{ l.line_total }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<table class="totals">
+  <tr><td>Subtotal</td><td class="r">{{ po.subtotal }}</td></tr>
+  <tr><td>Tax</td><td class="r">{{ po.tax_amount }}</td></tr>
+  <tr class="grand"><td>Total</td><td class="r">{{ po.total }}</td></tr>
+</table>
+
+{% if po.terms_and_conditions %}
+<div class="note"><span class="lbl">Terms &amp; Conditions</span><br>{{ po.terms_and_conditions }}</div>
+{% endif %}
+
+<table class="sign"><tr>
+  <td><div class="line"></div>Prepared by</td>
+  <td><div class="line"></div>Approved by</td>
+  <td><div class="line"></div>Vendor acknowledgement</td>
+</tr></table>
+{% endblock %}

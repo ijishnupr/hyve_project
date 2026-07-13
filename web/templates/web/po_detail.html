@@ -10,7 +10,10 @@
     <div class="text-muted small">{{ po.vendor }} · {{ po.project }}
       {% if po.requisition %}· from <a href="{% url 'web:pr_detail' po.requisition.pk %}">{{ po.requisition.number }}</a>{% endif %}</div>
   </div>
-  <a class="btn btn-outline-secondary btn-sm" href="{% url 'web:po_list' %}">Back</a>
+  <div>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'web:po_pdf' po.pk %}" target="_blank">Print PDF</a>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'web:po_list' %}">Back</a>
+  </div>
 </div>
 
 <div class="row g-3">
@@ -44,6 +47,22 @@
       </ul>
     </div>
 
+    {% if approval %}
+    <div class="card p-3 mt-3">
+      <h6>Approval workflow <span class="badge {{ approval.status|status_badge }}">{{ approval.get_status_display }}</span></h6>
+      <table class="table table-sm mb-0">
+        <thead><tr><th>Level</th><th>Role</th><th>Status</th><th>By</th><th>When</th></tr></thead>
+        <tbody>
+        {% for s in approval.steps.all %}
+          <tr><td>L{{ s.level }}</td><td>{{ s.role_required }}</td>
+            <td><span class="badge {{ s.status|status_badge }}">{{ s.get_status_display }}</span>{% if s.is_overdue %} <span class="badge badge-soft-red">Overdue</span>{% endif %}</td>
+            <td>{{ s.acted_by.get_username|default:"—" }}</td><td>{{ s.acted_at|date:"d M H:i"|default:"—" }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
     <div class="card p-3 mt-3">
       <h6>Vendor Bills</h6>
       <ul class="list-unstyled mb-0 small">
@@ -52,6 +71,38 @@
         {% empty %}<li class="text-muted">None yet.</li>{% endfor %}
       </ul>
     </div>
+
+    {% if po.revisions.all %}
+    <div class="card p-3 mt-3">
+      <h6>Revision history</h6>
+      <table class="table table-sm mb-0">
+        <thead><tr><th>Rev</th><th>Note</th><th class="text-end">Total</th><th>By</th><th>When</th></tr></thead>
+        <tbody>
+        {% for r in po.revisions.all %}
+          <tr><td>{{ r.revision }}</td><td>{{ r.note }}</td><td class="text-end">{{ r.total }}</td>
+            <td>{{ r.created_by.get_username|default:"—" }}</td><td>{{ r.created_at|date:"d M Y H:i" }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    <div class="card p-3 mt-3">
+      <h6>Attachments</h6>
+      <ul class="list-unstyled small">
+        {% for a in attachments %}
+          <li class="d-flex justify-content-between"><span>{{ a.get_kind_display }}: <a href="{{ a.file.url }}" target="_blank">{{ a.title }}</a></span>
+            {% if can_edit %}<a class="text-danger" href="{% url 'web:attachment_delete' a.pk %}">Remove</a>{% endif %}</li>
+        {% empty %}<li class="text-muted">No attachments.</li>{% endfor %}
+      </ul>
+      {% if can_edit %}
+      <form method="post" action="{% url 'web:attachment_add' 'purchaseorder' po.pk %}" enctype="multipart/form-data" class="row g-2 align-items-end">
+        {% csrf_token %}
+        {% for f in attachment_form %}<div class="col-auto"><label class="form-label small">{{ f.label }}</label>{{ f }}</div>{% endfor %}
+        <div class="col-auto"><button class="btn btn-sm btn-outline-secondary">+ Upload</button></div>
+      </form>
+      {% endif %}
+    </div>
   </div>
 
   <div class="col-lg-4">
@@ -59,11 +110,32 @@
       <h6>Actions</h6>
       {% if po.status == 'DRAFT' %}
         {% if can_edit %}<a class="btn btn-outline-secondary btn-sm w-100 mb-2" href="{% url 'web:po_edit' po.pk %}">Edit</a>{% endif %}
-        {% if can_approve %}<form method="post" action="{% url 'web:po_issue' po.pk %}">{% csrf_token %}
-          <button class="btn btn-primary btn-sm w-100 mb-2">Issue to vendor</button></form>{% endif %}
+        {% if needs_approval and not approval and can_edit %}
+          <form method="post" action="{% url 'web:po_submit_approval' po.pk %}">{% csrf_token %}
+            <button class="btn btn-primary btn-sm w-100 mb-2">Submit for approval</button></form>
+        {% endif %}
+        {% if can_approve %}
+          {% if needs_approval and approval.status != 'APPROVED' %}
+            <button class="btn btn-primary btn-sm w-100 mb-2" disabled title="Awaiting approval">Issue to vendor</button>
+          {% else %}
+            <form method="post" action="{% url 'web:po_issue' po.pk %}">{% csrf_token %}
+              <button class="btn btn-primary btn-sm w-100 mb-2">Issue to vendor</button></form>
+          {% endif %}
+        {% endif %}
+      {% endif %}
+      {% if po.status == 'ISSUED' or po.status == 'PARTIALLY_RECEIVED' or po.status == 'RECEIVED' %}
+        {% if can_edit %}<form method="post" action="{% url 'web:po_email' po.pk %}">{% csrf_token %}
+          <button class="btn btn-outline-secondary btn-sm w-100 mb-2">Email to vendor</button></form>{% endif %}
+      {% endif %}
+      {% if po.status == 'ISSUED' and can_approve %}
+        <form method="post" action="{% url 'web:po_reopen' po.pk %}" onsubmit="return confirm('Re-open this PO for revision?')">{% csrf_token %}
+          <button class="btn btn-outline-secondary btn-sm w-100 mb-2">Revise (re-open)</button></form>
       {% endif %}
       {% if receivable and can_edit %}
         <a class="btn btn-success btn-sm w-100 mb-2" href="{% url 'web:grn_new' po.pk %}">Receive goods (GRN)</a>
+      {% endif %}
+      {% if can_edit and po.status == 'PARTIALLY_RECEIVED' or can_edit and po.status == 'RECEIVED' or can_edit and po.status == 'CLOSED' %}
+        <a class="btn btn-outline-secondary btn-sm w-100 mb-2" href="{% url 'web:return_new' po.pk %}">Return goods</a>
       {% endif %}
       {% if po.status != 'DRAFT' and po.status != 'CANCELLED' and can_bill %}
         <a class="btn btn-outline-dark btn-sm w-100 mb-2" href="{% url 'web:bill_new' po.pk %}">Create vendor bill</a>

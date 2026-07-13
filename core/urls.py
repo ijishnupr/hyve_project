@@ -1,4 +1,6 @@
 """Root URL configuration."""
+from django.conf import settings
+from django.conf.urls.static import static
 from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import include, path
@@ -35,3 +37,6 @@ urlpatterns = [
     # Server-rendered web frontend (mounted at root; matched after the above).
     path("", include("web.urls")),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

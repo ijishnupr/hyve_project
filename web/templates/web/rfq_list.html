@@ -1,0 +1,27 @@
+{% extends "web/base.html" %}
+{% load web_extras %}
+{% block title %}RFQs{% endblock %}
+{% block crumb %}Procure-to-pay · <b>Requests for Quotation</b>{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">Requests for Quotation</h4>
+  {% if can_edit %}<a class="btn btn-dark btn-sm" href="{% url 'web:rfq_new' %}">+ New RFQ</a>{% endif %}
+</div>
+<div class="card"><div class="table-responsive">
+<table class="table table-hover align-middle mb-0">
+  <thead><tr><th>Number</th><th>Project</th><th>Suppliers</th><th>Issued</th><th>Deadline</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for r in rfqs %}
+    <tr>
+      <td><a href="{% url 'web:rfq_detail' r.pk %}">{{ r.number }}</a></td>
+      <td>{{ r.project.name }}</td>
+      <td>{{ r.vendors.count }}</td>
+      <td>{{ r.issue_date }}</td>
+      <td>{{ r.response_deadline|default:"—" }}{% if r.is_expired %} <span class="badge badge-soft-red">Expired</span>{% endif %}</td>
+      <td><span class="badge {{ r.status|status_badge }}">{{ r.get_status_display }}</span></td>
+    </tr>
+  {% empty %}<tr><td colspan="6" class="text-muted text-center py-4">No RFQs yet.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div></div>
+{% endblock %}

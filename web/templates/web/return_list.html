@@ -1,0 +1,22 @@
+{% extends "web/base.html" %}
+{% load web_extras %}
+{% block title %}Returns{% endblock %}
+{% block crumb %}Procure-to-pay · <b>Purchase Returns</b>{% endblock %}
+{% block content %}
+<h4 class="mb-3">Purchase Returns</h4>
+<div class="card"><div class="table-responsive">
+<table class="table table-hover align-middle mb-0">
+  <thead><tr><th>Number</th><th>PO</th><th>Vendor</th><th>Resolution</th><th>Date</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for r in returns %}
+    <tr>
+      <td><a href="{% url 'web:return_detail' r.pk %}">{{ r.number }}</a></td>
+      <td><a href="{% url 'web:po_detail' r.purchase_order.pk %}">{{ r.purchase_order.number }}</a></td>
+      <td>{{ r.vendor.name }}</td><td>{{ r.get_resolution_display }}</td><td>{{ r.return_date }}</td>
+      <td><span class="badge {{ r.status|status_badge }}">{{ r.get_status_display }}</span></td>
+    </tr>
+  {% empty %}<tr><td colspan="6" class="text-muted text-center py-4">No returns yet.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div></div>
+{% endblock %}

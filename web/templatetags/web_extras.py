@@ -39,6 +39,15 @@ def status_badge(value):
 
 
 @register.filter
+def dictkey(mapping, key):
+    """Look up ``mapping[key]`` from a template (for dynamic report columns)."""
+    try:
+        return mapping.get(key, "")
+    except AttributeError:
+        return ""
+
+
+@register.filter
 def status_color(value):
     """Return just the colour name (green/amber/red/blue/indigo/slate)."""
     return _BADGE.get(str(value).upper(), "badge-soft-slate").rsplit("-", 1)[-1]

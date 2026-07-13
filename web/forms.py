@@ -7,15 +7,33 @@ Line-item forms are exposed so views can build inline formsets with the right
 from django import forms
 
 from procurement.models import (
+    ApprovalRule,
+    Attachment,
+    ContractLine,
     GRNLine,
     GoodsReceiptNote,
+    PurchaseContract,
     Material,
     MaterialCategory,
     Project,
     PurchaseOrder,
     PurchaseOrderLine,
+    Payment,
+    PaymentSchedule,
     PurchaseRequisition,
     PurchaseRequisitionLine,
+    PurchaseReturn,
+    PurchaseReturnLine,
+    QCChecklistItem,
+    QualityInspection,
+    RequestForQuotation,
+    RFQLine,
+    SupplierAddress,
+    SupplierBankAccount,
+    SupplierContact,
+    SupplierDocument,
+    SupplierQuotation,
+    SupplierQuotationLine,
     Vendor,
     VendorBill,
     VendorBillLine,
@@ -63,15 +81,61 @@ class VendorForm(StyledModelForm):
     class Meta:
         model = Vendor
         fields = [
-            "code", "name", "gstin", "contact_person", "email", "phone",
-            "address", "payment_terms_days", "rating", "is_active",
+            "code", "name", "gstin", "pan", "contact_person", "email", "phone",
+            "website", "address", "payment_terms_days", "credit_limit",
+            "rating", "notes", "is_active",
         ]
+
+
+class SupplierContactForm(StyledModelForm):
+    class Meta:
+        model = SupplierContact
+        fields = ["name", "designation", "email", "phone", "is_primary"]
+
+
+class SupplierAddressForm(StyledModelForm):
+    class Meta:
+        model = SupplierAddress
+        fields = ["kind", "line1", "line2", "city", "state", "pincode", "country", "is_default"]
+
+
+class SupplierBankAccountForm(StyledModelForm):
+    class Meta:
+        model = SupplierBankAccount
+        fields = ["account_name", "account_number", "bank_name", "branch", "ifsc", "is_default"]
+
+
+class SupplierDocumentForm(StyledModelForm):
+    class Meta:
+        model = SupplierDocument
+        fields = ["title", "kind", "file", "expiry_date"]
+        widgets = {"expiry_date": _DATE}
 
 
 class MaterialCategoryForm(StyledModelForm):
     class Meta:
         model = MaterialCategory
         fields = ["name", "parent"]
+
+
+class AttachmentForm(StyledModelForm):
+    class Meta:
+        model = Attachment
+        fields = ["title", "kind", "file"]
+
+
+class ApprovalRuleForm(StyledModelForm):
+    class Meta:
+        model = ApprovalRule
+        fields = ["name", "document_type", "level", "role_required",
+                  "min_amount", "max_amount", "escalate_after_hours", "is_active"]
+
+    def __init__(self, *args, **kwargs):
+        from accounts.models import Role
+        super().__init__(*args, **kwargs)
+        self.fields["role_required"] = forms.ChoiceField(
+            choices=Role.choices, label="Role required")
+        style_form(self)
 
 
 class MaterialForm(StyledModelForm):
@@ -93,11 +157,68 @@ class PurchaseRequisitionForm(StyledModelForm):
         widgets = {"required_by": _DATE}
 
 
+class RequestForQuotationForm(StyledModelForm):
+    class Meta:
+        model = RequestForQuotation
+        fields = ["project", "requisition", "vendors", "issue_date",
+                  "response_deadline", "terms", "notes"]
+        widgets = {
+            "issue_date": _DATE,
+            "response_deadline": _DATE,
+            "vendors": forms.CheckboxSelectMultiple,
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["vendors"].queryset = Vendor.objects.filter(is_active=True)
+        self.fields["requisition"].queryset = PurchaseRequisition.objects.filter(
+            status=PurchaseRequisition.Status.APPROVED)
+        self.fields["requisition"].required = False
+
+
+class RFQLineForm(StyledModelForm):
+    class Meta:
+        model = RFQLine
+        fields = ["material", "quantity", "remarks"]
+
+
+class SupplierQuotationForm(StyledModelForm):
+    class Meta:
+        model = SupplierQuotation
+        fields = ["vendor", "quotation_date", "valid_until", "delivery_days",
+                  "warranty_months", "payment_terms_days", "notes"]
+        widgets = {"quotation_date": _DATE, "valid_until": _DATE}
+
+    def __init__(self, *args, rfq=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if rfq is not None:
+            invited = rfq.vendors.all()
+            self.fields["vendor"].queryset = invited if invited.exists() else Vendor.objects.filter(is_active=True)
+
+
+class SupplierQuotationLineForm(StyledModelForm):
+    class Meta:
+        model = SupplierQuotationLine
+        fields = ["material", "quantity", "unit_price", "tax_rate"]
+
+
+class QualityInspectionForm(StyledModelForm):
+    class Meta:
+        model = QualityInspection
+        fields = ["remarks"]
+
+
+class QCChecklistItemForm(StyledModelForm):
+    class Meta:
+        model = QCChecklistItem
+        fields = ["description", "result", "remarks"]
+
+
 class PurchaseOrderForm(StyledModelForm):
     class Meta:
         model = PurchaseOrder
         fields = [
-            "vendor", "project", "requisition", "order_date",
+            "vendor", "project", "requisition", "contract", "order_date",
             "expected_delivery_date", "delivery_address",
             "payment_terms_days", "terms_and_conditions",
         ]
@@ -116,6 +237,48 @@ class VendorBillForm(StyledModelForm):
         model = VendorBill
         fields = ["vendor_invoice_number", "bill_date", "due_date"]
         widgets = {"bill_date": _DATE, "due_date": _DATE}
+
+
+class PurchaseReturnForm(StyledModelForm):
+    class Meta:
+        model = PurchaseReturn
+        fields = ["resolution", "return_date", "reason", "credit_note_number"]
+        widgets = {"return_date": _DATE}
+
+
+class PurchaseReturnLineForm(StyledModelForm):
+    class Meta:
+        model = PurchaseReturnLine
+        fields = ["po_line", "quantity", "remarks"]
+
+
+class PurchaseContractForm(StyledModelForm):
+    class Meta:
+        model = PurchaseContract
+        fields = ["title", "vendor", "contract_type", "start_date", "end_date",
+                  "total_value", "auto_renew", "terms"]
+        widgets = {"start_date": _DATE, "end_date": _DATE}
+
+
+class ContractLineForm(StyledModelForm):
+    class Meta:
+        model = ContractLine
+        fields = ["material", "unit_price", "tax_rate", "max_quantity"]
+
+
+class PaymentForm(StyledModelForm):
+    class Meta:
+        model = Payment
+        fields = ["vendor", "bill", "purchase_order", "payment_type", "method",
+                  "amount", "payment_date", "reference", "notes"]
+        widgets = {"payment_date": _DATE}
+
+
+class PaymentScheduleForm(StyledModelForm):
+    class Meta:
+        model = PaymentSchedule
+        fields = ["vendor", "bill", "due_date", "amount", "note"]
+        widgets = {"due_date": _DATE}
 
 
 # ---------------------------------------------------------------------------
